@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: --deny warnings
+
+jobs:
+  check:
+    name: 'Build & test'
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Prepare cache key
+      run: |
+        cp Cargo.lock cache-fingerprint
+        echo $RUSTFLAGS >> cache-fingerprint
+        echo $(rustc -V) >> cache-fingerprint
+    - name: Restore cargo cache
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('cache-fingerprint') }}
+    - name: Install tsc
+      run: npm install
+      working-directory: lib
+    - name: Compile TS file
+      run: npx tsc --outFile src/generated/check.js
+      working-directory: lib
+    - name: Make sure generated JS file is up to date
+      run: diff -u --color lib/src/generated/browser.js lib/src/generated/check.js
+    - name: Build
+      run: cargo build
+    - name: Run tests
+      run: cargo test
