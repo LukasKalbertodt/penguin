@@ -1,4 +1,6 @@
 use std::io;
+
+mod proxy;
 mod config;
 
 
