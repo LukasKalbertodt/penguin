@@ -156,12 +156,18 @@ async fn handle_websocket(
             }
 
             message = websocket.next() => {
-                if message.is_none() {
-                    // TODO: notify websocket close
-                    break;
-                }
+                match message {
+                    Some(Err(e)) => Err(e)?,
 
-                println!("msg :("); // TODO
+                    // If the WS connection was closed, we can just stop this
+                    // function.
+                    None | Some(Ok(Message::Close(_))) => break,
+
+                    _ => {
+                        // TODO
+                        println!("warn: unexpected message {:?}", message);
+                    }
+                }
             }
         };
     }
