@@ -1,0 +1,8 @@
+{
+    "name": "penguin",
+    "version": "0.0.0",
+    "private": true,
+    "devDependencies": {
+        "typescript": "^4.1.5"
+    }
+}
