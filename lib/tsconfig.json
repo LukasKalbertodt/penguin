@@ -1,0 +1,16 @@
+{
+    "files": ["src/browser.ts"],
+    "compilerOptions": {
+        "outFile": "src/generated/browser.js",
+        "target": "ES6",
+        "skipLibCheck": true,
+
+        // I would prefer most of these to be warnings, but errors are better
+        // than nothing.
+        "strict": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+    }
+}

@@ -3,7 +3,7 @@ use crate::Config;
 
 /// Returns the JS code within `<script>` tags.
 pub(crate) fn script(config: &Config) -> String {
-    const JS_CODE: &str = include_str!("assets/inject.js");
+    const JS_CODE: &str = include_str!("generated/browser.js");
 
     let js = JS_CODE
         .replace("{{ control_path }}", &config.control_path);

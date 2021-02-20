@@ -1,6 +1,7 @@
 // This code was inserted by the 'penguin' library. It's here to enable features
 // like browser auto-reloading or showing messages. It does this by
 // communicating with the penguin server via a websocket.
+//
 
 // Configuration dependent values that are passed/interpolated by the penguin
 // server.
@@ -19,14 +20,14 @@ function onConnectionError() {
     console.warn(`Could not connect to web socket backend ${wsUri}`);
 }
 
-function onMessage(event) {
+function onMessage(event: MessageEvent) {
     if (typeof event.data !== 'string') {
         throw new Error("unexpected WS message from penguin");
     }
 
     const endLine = event.data.indexOf('\n');
     const command = event.data.slice(0, endLine === -1 ? undefined : endLine);
-    const payload = endLine === - 1 ? "" : event.data.slice(endLine + 1);
+    // const payload = endLine === - 1 ? "" : event.data.slice(endLine + 1);
 
     switch (command) {
         case "reload":
