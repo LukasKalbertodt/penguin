@@ -6,3 +6,4 @@ edition = "2018"
 
 
 [dependencies]
+hyper = { version = "0.14", features = ["client", "http1", "http2", "server", "tcp"] }
