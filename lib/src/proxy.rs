@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use hyper::{Body, Client, Request, Response, StatusCode, Uri, header};
 
-use crate::{Config, Error, ProxyTarget};
+use crate::{inject, Config, Error, ProxyTarget};
 
 
 /// HTML content to reply in case an error occurs when connecting to the proxy.
@@ -16,7 +16,7 @@ const PROXY_ERROR_HTML: &str = include_str!("assets/proxy-error.html");
 pub(crate) async fn forward(
     mut req: Request<Body>,
     target: &ProxyTarget,
-    _config: Arc<Config>,
+    config: Arc<Config>,
 ) -> Result<Response<Body>, Error> {
     // Build new URI and change the given request.
     let uri = {
@@ -36,7 +36,7 @@ pub(crate) async fn forward(
                 let (parts, body) = response.into_parts();
                 let body = hyper::body::to_bytes(body).await?;
 
-                let new_body = body; // TODO
+                let new_body = inject::into(&body, &config);
                 let new_len = new_body.len();
                 let new_body = Body::from(new_body);
 
@@ -54,7 +54,7 @@ pub(crate) async fn forward(
             let msg = format!("Failed to reach {}\n\n{}", uri, e);
             let html = PROXY_ERROR_HTML
                 .replace("{{ error }}", &msg)
-                .replace("{{ reload_script }}", "TODO");
+                .replace("{{ reload_script }}", &inject::script(&config));
 
             let status = if e.is_timeout() {
                 StatusCode::GATEWAY_TIMEOUT

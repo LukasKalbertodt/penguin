@@ -5,8 +5,9 @@ use hyper::{Body, Request, Response, Server, StatusCode, service::{make_service_
 use hyper_tungstenite::{HyperWebsocket, tungstenite::Message};
 use tokio::sync::broadcast::{self, Receiver, Sender, error::RecvError};
 
-mod proxy;
 mod config;
+mod inject;
+mod proxy;
 
 
 pub use config::{Config, ProxyTarget, ProxyTargetError};
