@@ -97,8 +97,9 @@ function onMessage(event: MessageEvent) {
 function showMessage(message: string) {
     let overlay = document.createElement("div");
 
+    // We encode '✖' as escape code to make this work with non-UTF8 HTML.
     let closeButton = document.createElement("button");
-    closeButton.innerText = "Close ✖";
+    closeButton.innerText = "Close \u2716";
     closeButton.style.fontSize = "20px";
     closeButton.style.fontFamily = "sans-serif";
     closeButton.style.display = "inline-block";
