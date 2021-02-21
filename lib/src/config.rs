@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, str::FromStr};
+use std::{net::SocketAddr, path::PathBuf, str::FromStr};
 
 use hyper::{Uri, http::uri};
 
@@ -24,6 +24,11 @@ pub struct Config {
     /// Proxy target that HTTP requests should be forwarded to.
     pub(crate) proxy: Option<ProxyTarget>,
 
+    /// A list of directories to serve as a file server. As expected from other
+    /// file servers, this lists the contents of directories and serves files
+    /// directly. HTML files are injected with the penguin JS code.
+    pub(crate) serve_dirs: Vec<ServeDir>,
+
     /// HTTP requests to this path are interpreted by this library to perform
     /// its function and are not normally served via the reverse proxy or the
     /// static file server.
@@ -34,7 +39,6 @@ pub struct Config {
     pub(crate) control_path: String,
 
     // TODO:
-    // serve_dirs: Vec<ServeDir>,
     // - callback
     // - string/name of service ("floof") for error pages
 }
@@ -47,12 +51,52 @@ impl Config {
             bind_addr,
             proxy: None,
             control_path: DEFAULT_CONTROL_PATH.into(),
+            serve_dirs: Vec::new(),
         }
     }
 
     /// Enables proxying request to the given proxy target.
     pub fn proxy(mut self, target: ProxyTarget) -> Self {
         self.proxy = Some(target);
+        self
+    }
+
+    /// Adds one directory to be served under `uri_path`.
+    ///
+    /// The following conditions of `uri_path` need to be fulfilled or otherwise
+    /// this function will panic:
+    ///
+    /// - `uri_path` must start with `/`.
+    /// - `uri_path` must not end in `/`.
+    /// - `uri_path` must not share a prefix with any previously added
+    ///   `uri_path`.
+    ///
+    ///
+    /// TODO: add example
+    pub fn add_serve_dir(
+        mut self,
+        uri_path: impl Into<String>,
+        fs_path: impl Into<PathBuf>,
+    ) -> Self {
+        let uri_path = uri_path.into();
+
+        // Check validity of URI path.
+        assert!(uri_path.starts_with('/'));
+        assert!(uri_path == "/" || !uri_path.ends_with('/'));
+        for other in &self.serve_dirs {
+            if other.uri_path.starts_with(&uri_path) || uri_path.starts_with(&other.uri_path) {
+                panic!(
+                    "URI path '{}' shares a prefix with previous URI path '{}'",
+                    uri_path,
+                    other.uri_path,
+                );
+            }
+        }
+
+        self.serve_dirs.push(ServeDir {
+            uri_path,
+            fs_path: fs_path.into(),
+        });
         self
     }
 }
@@ -100,7 +144,13 @@ pub enum ProxyTargetError {
     MissingAuthority,
 }
 
-// pub(crate) struct ServeDir {
-//     uri_path: String,
-//     fs_path: PathBuf,
-// }
+/// A mapping from URI path to file system path.
+pub(crate) struct ServeDir {
+    /// Path prefix of the URI that will map to the directory. Has to start with
+    /// `/` and *not* include the trailing `/`.
+    pub(crate) uri_path: String,
+
+    /// Path to a directory on the file system that is served under the
+    /// specified URI path.
+    pub(crate) fs_path: PathBuf,
+}

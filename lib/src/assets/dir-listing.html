@@ -1,0 +1,18 @@
+<html>
+  <head>
+    <title>Contents of directory {{ uri_path }}</title>
+    <style>
+        body {
+            font-family: 'sans-serif';
+            font-size: 16px;
+            line-height: 22px;
+            margin: 16px;
+        }
+    </style>
+  </head>
+  <body>
+    <h1>Contents of directory <code>{{ uri_path }}</code></h1>
+    <ul>{{ entries }}</ul>
+    {{ reload_script }}
+  </body>
+</html>

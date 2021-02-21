@@ -3,6 +3,7 @@ use std::{future::Future, io};
 use tokio::sync::broadcast::{self, Sender};
 
 mod config;
+mod fileserver;
 mod inject;
 mod proxy;
 mod server;

@@ -5,7 +5,7 @@ use hyper::{Body, Method, Request, Response, Server, StatusCode, service::{make_
 use hyper_tungstenite::{HyperWebsocket, tungstenite::Message};
 use tokio::sync::broadcast::{Receiver, Sender, error::RecvError};
 
-use super::{Action, Config, Error, proxy};
+use super::{Action, Config, Error, fileserver, proxy};
 
 
 pub(crate) async fn run(config: Config, actions: Sender<Action>) -> Result<(), Error> {
@@ -40,6 +40,8 @@ async fn handle(
         handle_control(req, config, actions).await?
     } else if let Some(proxy) = &config.proxy {
         proxy::forward(req, proxy, config.clone()).await?
+    } else if let Some(response) = fileserver::try_serve(req, config).await? {
+        response
     } else {
         Response::builder()
             .status(StatusCode::NOT_FOUND)
