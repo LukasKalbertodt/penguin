@@ -8,14 +8,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (controller, server) = penguin::serve(config)?;
 
-    // Dummy code to regularly reload all sessions.
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
-        loop {
-            interval.tick().await;
-            controller.reload();
-        }
-    });
+    // // Dummy code to regularly reload all sessions.
+    // tokio::spawn(async move {
+    //     let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
+    //     loop {
+    //         interval.tick().await;
+    //         controller.reload();
+    //     }
+    // });
 
     server.await?;
 

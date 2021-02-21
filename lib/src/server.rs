@@ -1,7 +1,7 @@
 use std::{convert::Infallible, sync::Arc};
 
 use futures::{SinkExt, StreamExt};
-use hyper::{Body, Request, Response, Server, StatusCode, service::{make_service_fn, service_fn}};
+use hyper::{Body, Method, Request, Response, Server, StatusCode, service::{make_service_fn, service_fn}};
 use hyper_tungstenite::{HyperWebsocket, tungstenite::Message};
 use tokio::sync::broadcast::{Receiver, Sender, error::RecvError};
 
@@ -53,7 +53,7 @@ async fn handle(
 /// Handles "control requests", i.e. request to the control path.
 async fn handle_control(
     req: Request<Body>,
-    _config: Arc<Config>,
+    config: Arc<Config>,
     actions: Sender<Action>,
 ) -> Result<Response<Body>, Error> {
     let response = if hyper_tungstenite::is_upgrade_request(&req) {
@@ -61,7 +61,7 @@ async fn handle_control(
 
         // Spawn a task to handle the websocket connection.
         tokio::spawn(async move {
-            let receiver = actions. subscribe();
+            let receiver = actions.subscribe();
             if let Err(e) = handle_websocket(websocket, receiver).await {
                 eprintln!("Error in websocket connection: {}", e);
             }
@@ -70,10 +70,25 @@ async fn handle_control(
         // Return the response so the spawned future can continue.
         response
     } else {
-        Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::from("Invalid request to libpenguin control path"))
-            .expect("bug: invalid response")
+        let subpath = req.uri().path().strip_prefix(&config.control_path).unwrap();
+        match (req.method(), subpath) {
+            (&Method::POST, "/reload") => {
+                // We ignore errors here: if there are no receivers, so be it.
+                // Although we might want to include the number of receivers in
+                // the event.
+                let _ = actions.send(Action::Reload);
+                // TODO: event
+
+                Response::new(Body::empty())
+            }
+
+            _ => {
+                Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Body::from("Invalid request to libpenguin control path"))
+                    .expect("bug: invalid response")
+            }
+        }
     };
 
     Ok(response)
