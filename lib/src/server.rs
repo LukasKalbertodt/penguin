@@ -82,6 +82,29 @@ async fn handle_control(
                 Response::new(Body::empty())
             }
 
+            (&Method::POST, "/message") => {
+                let (_, body) = req.into_parts();
+                let body = hyper::body::to_bytes(body).await?;
+
+                match std::str::from_utf8(&body) {
+                    Err(_) => {
+                        Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from("Bad request: request body is not UTF8"))
+                            .expect("bug: invalid response")
+                    }
+                    Ok(s) => {
+                        // We ignore errors here: if there are no receivers, so be it.
+                        // Although we might want to include the number of receivers in
+                        // the event.
+                        let _ = actions.send(Action::Message(s.into()));
+                        // TODO: event
+
+                        Response::new(Body::empty())
+                    }
+                }
+            }
+
             _ => {
                 Response::builder()
                     .status(StatusCode::BAD_REQUEST)
@@ -113,7 +136,8 @@ async fn handle_websocket(
                         // TODO: handle this somehow?
                         continue;
                     }
-                    Ok(Action::Reload) => "reload",
+                    Ok(Action::Reload) => "reload".to_string(),
+                    Ok(Action::Message(msg)) => format!("message\n{}", msg),
                 };
 
                 websocket.send(Message::text(data)).await?;

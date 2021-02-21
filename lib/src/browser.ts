@@ -15,6 +15,16 @@ const wsUri = (() => {
     return `${scheme}://${host}${control_path}`;
 })();
 
+// Open websocket connection and install handlers.
+const socket = new WebSocket(wsUri);
+socket.addEventListener("close", onConnectionError);
+socket.addEventListener("open", () => {
+    socket.removeEventListener("close", onConnectionError)
+
+    socket.addEventListener("close", () => console.log("penguin server closed WS connection"));
+    socket.addEventListener("message", onMessage);
+});
+
 
 function onConnectionError() {
     console.warn(`Could not connect to web socket backend ${wsUri}`);
@@ -27,24 +37,53 @@ function onMessage(event: MessageEvent) {
 
     const endLine = event.data.indexOf('\n');
     const command = event.data.slice(0, endLine === -1 ? undefined : endLine);
-    // const payload = endLine === - 1 ? "" : event.data.slice(endLine + 1);
+    const payload = endLine === - 1 ? "" : event.data.slice(endLine + 1);
 
     switch (command) {
         case "reload":
             console.log("Received reload request from penguin server: reloading page...");
             location.reload();
             break;
+
+        case "message":
+            showMessage(payload);
+            break;
+
         default:
             throw new Error("unexpected WS command from penguin");
     }
 }
 
-// Open websocket connection and install handlers.
-const socket = new WebSocket(wsUri);
-socket.addEventListener("close", onConnectionError);
-socket.addEventListener("open", () => {
-    socket.removeEventListener("close", onConnectionError)
+function showMessage(message: string) {
+    let overlay = document.createElement("div");
 
-    socket.addEventListener("close", () => console.log("penguin server closed WS connection"));
-    socket.addEventListener("message", onMessage);
-});
+    let closeButton = document.createElement("button");
+    closeButton.innerText = "Close ✖";
+    closeButton.style.fontSize = "20px";
+    closeButton.style.fontFamily = "sans-serif";
+    closeButton.style.display = "inline-block";
+    closeButton.style.cursor = "pointer";
+    closeButton.addEventListener("click", () => overlay.style.display = "none");
+
+    let header = document.createElement("div");
+    header.style.textAlign = "right";
+    header.style.margin = "8px";
+    header.appendChild(closeButton);
+
+    let content = document.createElement("div");
+    content.innerHTML = message;
+    content.style.margin = "16px";
+    content.style.height = "100%";
+
+    overlay.appendChild(header);
+    overlay.appendChild(content);
+    overlay.style.position= "fixed";
+    overlay.style.zIndex = "987654321"; // Arbitrary very large number
+    overlay.style.height = "100vh";
+    overlay.style.width = "100vw";
+    overlay.style.top = "0";
+    overlay.style.left = "0";
+    overlay.style.backgroundColor = "#ebebeb";
+
+    document.body.prepend(overlay);
+}

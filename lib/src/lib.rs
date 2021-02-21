@@ -31,11 +31,20 @@ impl Controller {
     pub fn reload(&self) {
         let _ = self.0.send(Action::Reload);
     }
+
+    /// Shows a message as overlay in all active browser sessions. The given
+    /// string will be copied into the `innerHTML` of a `<div>` verbatim.
+    ///
+    /// This call will overwrite/hide all previous messages.
+    pub fn show_message(&self, msg: impl Into<String>) {
+        let _ = self.0.send(Action::Message(msg.into()));
+    }
 }
 
 #[derive(Debug, Clone)]
 enum Action {
     Reload,
+    Message(String),
 }
 
 const ACTION_CHANNEL_SIZE: usize = 4;
