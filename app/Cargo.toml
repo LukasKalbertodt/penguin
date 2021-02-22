@@ -7,3 +7,10 @@ edition = "2018"
 [[bin]]
 name = "penguin"
 path = "src/main.rs"
+
+
+[dependencies]
+bunt = "0.2.4"
+penguin = { path = "../lib" }
+structopt = "0.3"
+tokio = { version = "1", features = ["rt", "macros"]}
