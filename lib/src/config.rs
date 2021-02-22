@@ -17,6 +17,7 @@ use hyper::{Uri, http::uri};
 const DEFAULT_CONTROL_PATH: &str = "/~~penguin";
 
 /// Configuration for the penguin server. This type uses the builder pattern to
+#[derive(Debug)]
 pub struct Config {
     /// The port/socket address the server should be listening on.
     pub(crate) bind_addr: SocketAddr,
@@ -101,6 +102,7 @@ impl Config {
     }
 }
 
+#[derive(Debug)]
 pub struct ProxyTarget {
     pub(crate) scheme: uri::Scheme,
     pub(crate) authority: uri::Authority,
@@ -145,6 +147,7 @@ pub enum ProxyTargetError {
 }
 
 /// A mapping from URI path to file system path.
+#[derive(Debug)]
 pub(crate) struct ServeDir {
     /// Path prefix of the URI that will map to the directory. Has to start with
     /// `/` and *not* include the trailing `/`.
