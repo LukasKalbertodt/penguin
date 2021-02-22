@@ -64,14 +64,11 @@ impl Config {
 
     /// Adds one directory to be served under `uri_path`.
     ///
-    /// The following conditions of `uri_path` need to be fulfilled or otherwise
-    /// this function will panic:
-    ///
-    /// - `uri_path` must start with `/`.
-    /// - `uri_path` must not end in `/`.
-    /// - `uri_path` must not share a prefix with any previously added
-    ///   `uri_path`.
-    ///
+    /// `uri_path` must start with `/` and must *not* end in `/`, otherwise this
+    /// method will panic. Directories added with this method will have a higher
+    /// priority than directories added later. That means when matching an
+    /// incoming request against the lists of directories, the first one where
+    /// the `uri_path` matches the request path is used.
     ///
     /// TODO: add example
     pub fn add_serve_dir(
@@ -84,15 +81,6 @@ impl Config {
         // Check validity of URI path.
         assert!(uri_path.starts_with('/'));
         assert!(uri_path == "/" || !uri_path.ends_with('/'));
-        for other in &self.serve_dirs {
-            if other.uri_path.starts_with(&uri_path) || uri_path.starts_with(&other.uri_path) {
-                panic!(
-                    "URI path '{}' shares a prefix with previous URI path '{}'",
-                    uri_path,
-                    other.uri_path,
-                );
-            }
-        }
 
         self.serve_dirs.push(ServeDir {
             uri_path,
