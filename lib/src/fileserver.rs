@@ -71,9 +71,28 @@ async fn serve_dir(uri_path: &str, path: &Path, config: &Config) -> Result<Respo
     while let Some(entry) = it.next_entry().await? {
         let name = entry.file_name().to_string_lossy().into_owned();
         if entry.file_type().await?.is_file() {
-            files.push(name);
+            files.push((name, false));
         } else {
-            folders.push(name + "/");
+            folders.push((name + "/", false));
+        }
+    }
+
+    // Also collect all mounts that are mounted below this path.
+    for sd in config.serve_dirs.iter().filter(|sd| sd.fs_path.exists()) {
+        if let Some(rest) = sd.uri_path.strip_prefix(uri_path) {
+            if rest.is_empty() {
+                continue;
+            }
+
+            let name = rest.find('/')
+                .map(|pos| &rest[..pos])
+                .unwrap_or(rest)
+                .to_owned();
+            if sd.fs_path.is_dir() {
+                folders.push((name + "/", true));
+            } else {
+                files.push((name, true));
+            }
         }
     }
 
@@ -82,10 +101,11 @@ async fn serve_dir(uri_path: &str, path: &Path, config: &Config) -> Result<Respo
 
     // Build list of children.
     let mut entries = String::new();
-    for name in folders.into_iter().chain(files) {
+    for (name, is_mount) in folders.into_iter().chain(files) {
         entries.push_str(&format!(
-            r#"<li><a href="{0}"><code>{0}</code></a></li>"#,
+            r#"<li><a href="{0}" class="{1}"><code>{0}</code></a></li>"#,
             name,
+            if is_mount { "mount" } else { "real" },
         ));
     }
 
