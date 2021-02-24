@@ -17,7 +17,16 @@ pub(crate) async fn try_serve(
         req.uri()
             .path()
             .strip_prefix(&sd.uri_path)
-            .map(|subpath| (subpath.to_owned(), &sd.fs_path))
+            .map(|subpath| {
+                // Make sure that subpath never starts with `/`.
+                let subpath = if subpath.starts_with('/') {
+                    &subpath[1..]
+                } else {
+                    subpath
+                };
+
+                (subpath.to_owned(), &sd.fs_path)
+            })
     });
 
     match dir {
