@@ -38,10 +38,10 @@ async fn handle(
 ) -> Result<Response<Body>, Error> {
     let response = if req.uri().path().starts_with(&config.control_path) {
         handle_control(req, config, actions).await?
+    } else if let Some(response) = fileserver::try_serve(&req, &config).await? {
+        response
     } else if let Some(proxy) = &config.proxy {
         proxy::forward(req, proxy, config.clone()).await?
-    } else if let Some(response) = fileserver::try_serve(req, config).await? {
-        response
     } else {
         Response::builder()
             .status(StatusCode::NOT_FOUND)

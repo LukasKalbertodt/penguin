@@ -15,21 +15,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build Penguin configuration from arguments.
     let bind_addr = (args.bind, args.port).into();
     let mut builder = Server::bind(bind_addr);
+    for mount in &args.mounts {
+        builder = builder.add_mount(&mount.uri_path, &mount.fs_path)?;
+    }
     match args.cmd {
         Command::Proxy { target } => builder = builder.proxy(target),
-        Command::Serve { path } => {
-            if let Some(path) = path {
-                builder = builder.add_mount("/", &path)?;
-            } else if args.mounts.is_empty() {
+        Command::Serve { path: Some(path) } => builder = builder.add_mount("/", &path)?,
+        Command::Serve { path: None } => {
+            if args.mounts.is_empty() {
                 bunt::eprintln!(
                     "{$red+bold}error:{/$} neither serve path nor '--mount' arguments \
                         given, but at least one path has to be specified!"
                 );
                 std::process::exit(1);
-            }
-
-            for mount in &args.mounts {
-                builder = builder.add_mount(&mount.uri_path, &mount.fs_path)?;
             }
         },
     }

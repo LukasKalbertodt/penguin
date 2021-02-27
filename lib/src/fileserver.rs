@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc};
+use std::path::Path;
 
 use hyper::{Body, Request, Response, StatusCode};
 use tokio::fs;
@@ -10,8 +10,8 @@ use crate::{inject, Config, Error};
 /// Checks if the request matches any `config.mounts` and returns an
 /// appropriate response in that case. Otherwise `Ok(None)` is returned.
 pub(crate) async fn try_serve(
-    req: Request<Body>,
-    config: Arc<Config>,
+    req: &Request<Body>,
+    config: &Config,
 ) -> Result<Option<Response<Body>>, Error> {
     let dir = config.mounts.iter()
         .filter_map(|sd| {
@@ -28,13 +28,13 @@ pub(crate) async fn try_serve(
         .max_by_key(|(_, sd)| sd.uri_path.len());
 
     match dir {
-        Some((subpath, sd)) => serve(req, &subpath, &sd.fs_path, &config).await.map(Some),
+        Some((subpath, sd)) => serve(req, &subpath, &sd.fs_path, config).await.map(Some),
         None => Ok(None),
     }
 }
 
 async fn serve(
-    req: Request<Body>,
+    req: &Request<Body>,
     subpath: &str,
     fs_root: &Path,
     config: &Config,
