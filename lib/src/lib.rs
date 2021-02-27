@@ -1,4 +1,6 @@
-use std::{future::Future, io, net::SocketAddr, pin::Pin, task};
+#![deny(missing_debug_implementations)]
+
+use std::{fmt, future::Future, io, net::SocketAddr, pin::Pin, task};
 
 use tokio::sync::broadcast::{self, Sender};
 
@@ -46,6 +48,12 @@ impl Future for Server {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         self.future.as_mut().poll(cx)
+    }
+}
+
+impl fmt::Debug for Server {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("Server(_)")
     }
 }
 

@@ -22,7 +22,7 @@ const DEFAULT_CONTROL_PATH: &str = "/~~penguin";
 ///
 /// To create a configuration, use [`Server::bind`] to obtain a [`Builder`]
 /// which can be turned into a `Config`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     /// The port/socket address the server should be listening on.
     pub(crate) bind_addr: SocketAddr,
@@ -64,6 +64,7 @@ impl Config {
 }
 
 /// Builder for the configuration of `Server`.
+#[derive(Debug, Clone)]
 pub struct Builder(Config);
 
 impl Builder {
@@ -173,7 +174,7 @@ pub enum ConfigError {
 /// To create this type you can:
 /// - use the `FromStr` impl: `"http://localhost:8000".parse()`, or
 /// - use the `From<(Scheme, Authority)>` impl.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProxyTarget {
     pub(crate) scheme: uri::Scheme,
     pub(crate) authority: uri::Authority,
@@ -226,7 +227,7 @@ pub enum ProxyTargetError {
 }
 
 /// A mapping from URI path to file system path.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mount {
     /// Path prefix of the URI that will map to the directory. Has to start with
     /// `/` and *not* include the trailing `/`.
