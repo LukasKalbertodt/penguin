@@ -13,24 +13,22 @@ pub(crate) async fn try_serve(
     req: Request<Body>,
     config: Arc<Config>,
 ) -> Result<Option<Response<Body>>, Error> {
-    let dir = config.serve_dirs.iter().find_map(|sd| {
-        req.uri()
-            .path()
-            .strip_prefix(&sd.uri_path)
-            .map(|subpath| {
-                // Make sure that subpath never starts with `/`.
-                let subpath = if subpath.starts_with('/') {
-                    &subpath[1..]
-                } else {
-                    subpath
-                };
+    let dir = config.serve_dirs.iter()
+        .filter_map(|sd| {
+            req.uri()
+                .path()
+                .strip_prefix(&sd.uri_path)
+                .map(|subpath| {
+                    // Make sure that subpath never starts with `/`.
+                    (subpath.trim_start_matches('/').to_owned(), sd)
+                })
+        })
 
-                (subpath.to_owned(), &sd.fs_path)
-            })
-    });
+        // We want the "most specific" mount, so the longest URI path wins.
+        .max_by_key(|(_, sd)| sd.uri_path.len());
 
     match dir {
-        Some((subpath, fs_root)) => serve(req, &subpath, fs_root, &config).await.map(Some),
+        Some((subpath, sd)) => serve(req, &subpath, &sd.fs_path, &config).await.map(Some),
         None => Ok(None),
     }
 }
