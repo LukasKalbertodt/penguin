@@ -1,4 +1,4 @@
-use penguin::Config;
+use penguin::Server;
 use structopt::StructOpt;
 
 use crate::args::{Args, Command};
@@ -14,12 +14,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build Penguin configuration from arguments.
     let bind_addr = (args.bind, args.port).into();
-    let mut config = Config::new(bind_addr);
+    let mut builder = Server::bind(bind_addr);
     match args.cmd {
-        Command::Proxy { target } => config = config.proxy(target),
+        Command::Proxy { target } => builder = builder.proxy(target),
         Command::Serve { path } => {
             if let Some(path) = path {
-                config = config.add_serve_dir("/", &path);
+                builder = builder.add_mount("/", &path)?;
             } else if args.mounts.is_empty() {
                 bunt::eprintln!(
                     "{$red+bold}error:{/$} neither serve path nor '--mount' arguments \
@@ -29,15 +29,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             for mount in &args.mounts {
-                config = config.add_serve_dir(&mount.uri_path, &mount.fs_path);
+                builder = builder.add_mount(&mount.uri_path, &mount.fs_path)?;
             }
         },
     }
 
-    let (_controller, serve) = penguin::serve(config)?;
+    let (server, _controller) = builder.build()?;
 
     bunt::println!("Penguin 🐧 is listening on {$yellow+intense+bold}http://{}{/$}", bind_addr);
-    serve.await?;
+    server.await?;
 
     Ok(())
 }

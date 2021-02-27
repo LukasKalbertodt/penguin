@@ -7,13 +7,13 @@ use tokio_util::codec::{FramedRead, BytesCodec};
 use crate::{inject, Config, Error};
 
 
-/// Checks if the request matches any `config.serve_dirs` and returns an
+/// Checks if the request matches any `config.mounts` and returns an
 /// appropriate response in that case. Otherwise `Ok(None)` is returned.
 pub(crate) async fn try_serve(
     req: Request<Body>,
     config: Arc<Config>,
 ) -> Result<Option<Response<Body>>, Error> {
-    let dir = config.serve_dirs.iter()
+    let dir = config.mounts.iter()
         .filter_map(|sd| {
             req.uri()
                 .path()
@@ -85,7 +85,7 @@ async fn serve_dir(uri_path: &str, path: &Path, config: &Config) -> Result<Respo
     }
 
     // Also collect all mounts that are mounted below this path.
-    for sd in config.serve_dirs.iter().filter(|sd| sd.fs_path.exists()) {
+    for sd in config.mounts.iter().filter(|sd| sd.fs_path.exists()) {
         if let Some(rest) = sd.uri_path.strip_prefix(uri_path) {
             if rest.is_empty() {
                 continue;

@@ -2,6 +2,8 @@ use std::{fmt, net::SocketAddr, path::PathBuf, str::FromStr};
 
 use hyper::{Uri, http::uri};
 
+use crate::{Controller, Server};
+
 
 /// The URI path which is used for penguin internal control functions (e.g.
 /// opening WS connections).
@@ -16,7 +18,10 @@ use hyper::{Uri, http::uri};
 /// don't need to be escaped and don't have a special meaning.
 const DEFAULT_CONTROL_PATH: &str = "/~~penguin";
 
-/// Configuration for the penguin server. This type uses the builder pattern to
+/// A valid penguin server configuration.
+///
+/// To create a configuration, use [`Server::bind`] to obtain a [`Builder`]
+/// which can be turned into a `Config`.
 #[derive(Debug)]
 pub struct Config {
     /// The port/socket address the server should be listening on.
@@ -28,7 +33,7 @@ pub struct Config {
     /// A list of directories to serve as a file server. As expected from other
     /// file servers, this lists the contents of directories and serves files
     /// directly. HTML files are injected with the penguin JS code.
-    pub(crate) serve_dirs: Vec<ServeDir>,
+    pub(crate) mounts: Vec<Mount>,
 
     /// HTTP requests to this path are interpreted by this library to perform
     /// its function and are not normally served via the reverse proxy or the
@@ -45,51 +50,129 @@ pub struct Config {
 }
 
 impl Config {
-    /// Creates a new configuration. The `bind_addr` is what the server will
-    /// listen on.
-    pub fn new(bind_addr: SocketAddr) -> Self {
-        Self {
-            bind_addr,
-            proxy: None,
-            control_path: DEFAULT_CONTROL_PATH.into(),
-            serve_dirs: Vec::new(),
-        }
+    pub fn proxy(&self) -> Option<&ProxyTarget> {
+        self.proxy.as_ref()
     }
 
-    /// Enables proxying request to the given proxy target.
-    pub fn proxy(mut self, target: ProxyTarget) -> Self {
-        self.proxy = Some(target);
-        self
+    pub fn mounts(&self) -> &[Mount] {
+        &self.mounts
     }
 
-    /// Adds one directory to be served under `uri_path`.
-    ///
-    /// `uri_path` must start with `/` and must *not* end in `/`, otherwise this
-    /// method will panic. Directories added with this method will have a higher
-    /// priority than directories added later. That means when matching an
-    /// incoming request against the lists of directories, the first one where
-    /// the `uri_path` matches the request path is used.
-    ///
-    /// TODO: add example
-    pub fn add_serve_dir(
-        mut self,
-        uri_path: impl Into<String>,
-        fs_path: impl Into<PathBuf>,
-    ) -> Self {
-        let uri_path = uri_path.into();
-
-        // Check validity of URI path.
-        assert!(uri_path.starts_with('/'));
-        assert!(uri_path == "/" || !uri_path.ends_with('/'));
-
-        self.serve_dirs.push(ServeDir {
-            uri_path,
-            fs_path: fs_path.into(),
-        });
-        self
+    pub fn control_path(&self) -> &str {
+        &self.control_path
     }
 }
 
+/// Builder for the configuration of `Server`.
+pub struct Builder(Config);
+
+impl Builder {
+    /// Creates a new configuration. The `bind_addr` is what the server will
+    /// listen on.
+    pub(crate) fn new(bind_addr: SocketAddr) -> Self {
+        Self(Config {
+            bind_addr,
+            proxy: None,
+            control_path: DEFAULT_CONTROL_PATH.into(),
+            mounts: Vec::new(),
+        })
+    }
+
+    /// Enables and sets a proxy: incoming requests (that do not match a mount)
+    /// are forwarded to the given proxy target and its response is forwarded
+    /// back to the initiator of the request.
+    ///
+    /// **Panics** if this method is called more than once on a single
+    /// `Builder`.
+    pub fn proxy(mut self, target: ProxyTarget) -> Self {
+        if let Some(prev) = self.0.proxy {
+            panic!(
+                "`Builder::proxy` called a second time: is called with '{}' now \
+                    but was previously called with '{}'",
+                target,
+                prev,
+            );
+        }
+
+        self.0.proxy = Some(target);
+        self
+    }
+
+    /// Adds a mount: a directory to be served via file server under `uri_path`.
+    /// The order in which the serve dirs are added does not matter. When
+    /// serving a request, the most specific matching entry "wins".
+    ///
+    /// This method returns `ConfigError::DuplicateUriPath` if the same
+    /// `uri_path` was added before.
+    ///
+    pub fn add_mount(
+        mut self,
+        uri_path: impl Into<String>,
+        fs_path: impl Into<PathBuf>,
+    ) -> Result<Self, ConfigError> {
+        let mut uri_path = uri_path.into();
+
+        // Normalize URI path.
+        if uri_path.len() > 1 && uri_path.ends_with('/') {
+            uri_path.pop();
+        }
+        if !uri_path.starts_with('/') {
+            uri_path.insert(0, '/');
+        }
+
+        if self.0.mounts.iter().any(|other| other.uri_path == uri_path) {
+            return Err(ConfigError::DuplicateUriPath(uri_path));
+        }
+
+        self.0.mounts.push(Mount {
+            uri_path,
+            fs_path: fs_path.into(),
+        });
+
+        Ok(self)
+    }
+
+    /// Validates the configuration and builds the server and controller from
+    /// it. This is a shortcut for [`Builder::validate`] plus [`Server::build`].
+    pub fn build(self) -> Result<(Server, Controller), ConfigError> {
+        self.validate().map(Server::build)
+    }
+
+    /// Validates the configuration and returns the finished [`Config`].
+    pub fn validate(self) -> Result<Config, ConfigError> {
+        if self.0.proxy.is_none() && self.0.mounts.is_empty() {
+            return Err(ConfigError::NoProxyOrMount)
+        }
+
+        if self.0.proxy.is_some() && self.0.mounts.iter().any(|other| other.uri_path == "/") {
+            return Err(ConfigError::ProxyAndRootMount);
+        }
+
+        Ok(self.0)
+    }
+}
+
+/// Reasons for an incorrect configuration.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ConfigError {
+    #[error("URI path '{0}' was added as mount twice")]
+    DuplicateUriPath(String),
+
+    #[error("a proxy was configured but a mount on '/' was added as well (in \
+        that case, the proxy is would be ignored)")]
+    ProxyAndRootMount,
+
+    #[error("neither a proxy nor a mount was specified: server would always \
+        respond 404 in this case")]
+    NoProxyOrMount,
+}
+
+/// Defintion of a proxy target consisting of a scheme and authority (≈host).
+///
+/// To create this type you can:
+/// - use the `FromStr` impl: `"http://localhost:8000".parse()`, or
+/// - use the `From<(Scheme, Authority)>` impl.
 #[derive(Debug)]
 pub struct ProxyTarget {
     pub(crate) scheme: uri::Scheme,
@@ -144,12 +227,12 @@ pub enum ProxyTargetError {
 
 /// A mapping from URI path to file system path.
 #[derive(Debug)]
-pub(crate) struct ServeDir {
+pub struct Mount {
     /// Path prefix of the URI that will map to the directory. Has to start with
     /// `/` and *not* include the trailing `/`.
-    pub(crate) uri_path: String,
+    pub uri_path: String,
 
     /// Path to a directory on the file system that is served under the
     /// specified URI path.
-    pub(crate) fs_path: PathBuf,
+    pub fs_path: PathBuf,
 }

@@ -1,4 +1,4 @@
-use std::{future::Future, io};
+use std::{future::Future, io, net::SocketAddr, pin::Pin, task};
 
 use tokio::sync::broadcast::{self, Sender};
 
@@ -8,22 +8,50 @@ mod inject;
 mod proxy;
 mod server;
 
+/// Reexport of `http` dependency.
+pub use hyper::http;
 
-pub use config::{Config, ProxyTarget, ProxyTargetError};
+pub use config::{Builder, Config, Mount, ProxyTarget, ProxyTargetError};
 
-#[non_exhaustive]
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("hyper HTTP server error: {0}")]
-    Hyper(#[from] hyper::Error),
-
-    #[error("IO error: {0}")]
-    Io(#[from] io::Error),
-
-    #[error("Websocket error: {0}")]
-    Tungestine(#[from] hyper_tungstenite::tungstenite::Error),
+/// Penguin server: the main type of this library.
+///
+/// This type implements `Future`, and can thus be `await`ed. If you do not
+/// `await` (or otherwise poll) this, the server will not start serving.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct Server {
+    // TODO: maybe avoid boxing this if possible?
+    future: Pin<Box<dyn Send + Future<Output = Result<(), Error>>>>,
 }
 
+impl Server {
+    /// Returns a builder to configure the server with the bind address of the
+    /// server being set to `addr`.
+    pub fn bind(addr: SocketAddr) -> Builder {
+        Builder::new(addr)
+    }
+
+    /// Builds a server and a controller from a configuration. Most of the time
+    /// you can use [`Builder::build`] instead of this method.
+    pub fn build(config: Config) -> (Self, Controller) {
+        let (sender, _) = broadcast::channel(ACTION_CHANNEL_SIZE);
+        let controller = Controller(sender.clone());
+        let future = Box::pin(server::run(config, sender));
+
+        (Self { future }, controller)
+    }
+}
+
+impl Future for Server {
+    type Output = Result<(), Error>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        self.future.as_mut().poll(cx)
+    }
+}
+
+const ACTION_CHANNEL_SIZE: usize = 4;
+
+/// A handle to send commands to the server.
 #[derive(Debug, Clone)]
 pub struct Controller(Sender<Action>);
 
@@ -42,26 +70,23 @@ impl Controller {
     }
 }
 
+/// Error returned by awaiting `Server`: everything that can go wrong when
+/// running the server.
+#[non_exhaustive]
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("hyper HTTP server error: {0}")]
+    Hyper(#[from] hyper::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+
+    #[error("Websocket error: {0}")]
+    Tungestine(#[from] hyper_tungstenite::tungstenite::Error),
+}
+
 #[derive(Debug, Clone)]
 enum Action {
     Reload,
     Message(String),
-}
-
-const ACTION_CHANNEL_SIZE: usize = 4;
-
-/// Main entry point of this library: returns a controller and a future that
-/// represent the server.
-///
-/// You have to poll the future (usually by `await`ing it) in order for the
-/// server to actually listen and serve requests. The controller can be used to
-/// send various control signals.
-pub fn serve(
-    config: Config,
-) -> Result<(Controller, impl Future<Output = Result<(), Error>>), Error> {
-    let (sender, _) = broadcast::channel(ACTION_CHANNEL_SIZE);
-    let controller = Controller(sender.clone());
-    let future = server::run(config, sender);
-
-    Ok((controller, future))
 }
