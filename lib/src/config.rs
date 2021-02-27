@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, path::PathBuf, str::FromStr};
+use std::{fmt, net::SocketAddr, path::PathBuf, str::FromStr};
 
 use hyper::{Uri, http::uri};
 
@@ -99,6 +99,14 @@ pub struct ProxyTarget {
 impl From<(uri::Scheme, uri::Authority)> for ProxyTarget {
     fn from((scheme, authority): (uri::Scheme, uri::Authority)) -> Self {
         Self { scheme, authority }
+    }
+}
+
+impl fmt::Display for ProxyTarget {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.scheme.fmt(f)?;
+        self.authority.fmt(f)?;
+        Ok(())
     }
 }
 
