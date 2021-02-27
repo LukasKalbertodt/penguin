@@ -60,6 +60,8 @@ async fn serve(
             .expect("bug: invalid response")
     } else if path.is_file() {
         serve_file(&path, config).await?
+    } else if path.join("index.html").is_file() {
+        serve_file(&path.join("index.html"), config).await?
     } else {
         serve_dir(req.uri().path(), &path, config).await?
     };
