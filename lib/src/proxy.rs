@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use hyper::{Body, Client, Request, Response, StatusCode, Uri, header};
+use hyper_tls::HttpsConnector;
 
 use crate::{inject, Config, Error, ProxyTarget};
 
@@ -27,7 +28,8 @@ pub(crate) async fn forward(
     };
     *req.uri_mut() = uri.clone();
 
-    let response = match Client::new().request(req).await {
+    let client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
+    let response = match client.request(req).await {
         Ok(response) => {
             let content_type = response.headers().get(header::CONTENT_TYPE);
             if content_type.map_or(false, |v| v.as_ref().starts_with(b"text/html")) {
