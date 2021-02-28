@@ -28,7 +28,7 @@ pub(crate) struct Args {
     /// Example: '--mount assets:/home/peter/images'. Can be specified multiple
     /// times. If you only want to mount one directory in the root, rather use
     /// the `penguin serve` subcommand.
-    #[structopt(long = "--mount", number_of_values = 1, global = true)]
+    #[structopt(short, long = "--mount", number_of_values = 1, global = true)]
     pub(crate) mounts: Vec<Mount>,
 
     /// Overrides the default control path '/~~penguin' with a custom path.
