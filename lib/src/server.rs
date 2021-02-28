@@ -175,8 +175,16 @@ async fn handle_websocket(
                     // When all senders have closed, there is no reason to
                     // continue keeping this task alive.
                     Err(RecvError::Closed) => break,
-                    Err(RecvError::Lagged(_)) => {
-                        // TODO: handle this somehow?
+                    Err(RecvError::Lagged(skipped)) => {
+                        // I really can't imagine this happening: this would
+                        // mean this WS task was never awoken while many actions
+                        // were incoming.
+                        log::warn!(
+                            "Missed {} actions. This should not happen. \
+                                If you see this, please open an issue here: \
+                                https://github.com/LukasKalbertodt/penguin/issues",
+                            skipped,
+                        );
                         continue;
                     }
                     Ok(Action::Reload) => {

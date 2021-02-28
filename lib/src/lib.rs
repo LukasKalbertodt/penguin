@@ -57,7 +57,7 @@ impl fmt::Debug for Server {
     }
 }
 
-const ACTION_CHANNEL_SIZE: usize = 4;
+const ACTION_CHANNEL_SIZE: usize = 8;
 
 /// A handle to send commands to the server.
 #[derive(Debug, Clone)]
