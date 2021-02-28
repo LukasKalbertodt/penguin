@@ -16,20 +16,24 @@ pub(crate) struct Args {
     #[structopt(short, long, default_value = "4090")]
     pub(crate) port: u16,
 
-    /// Address to bind to. Mostly useful to set to "0.0.0.0" to let other
+    /// Address to bind to.
+    ///
+    /// Mostly useful to set to "0.0.0.0" to let other
     /// devices in your network access the server.
     #[structopt(long, default_value = "127.0.0.1")]
     pub(crate) bind: IpAddr,
 
-    /// Mount a directory on an URI path: '--mount <uri>:<path>', e.g. '--mount
-    /// assets:/home/peter/images'. Can be specified multiple times. If you only
-    /// want to mount one directory in the root, rather use the `penguin serve`
-    /// subcommand.
+    /// Mount a directory on an URI path: '--mount <uri>:<path>'.
+    ///
+    /// Example: '--mount assets:/home/peter/images'. Can be specified multiple
+    /// times. If you only want to mount one directory in the root, rather use
+    /// the `penguin serve` subcommand.
     #[structopt(long = "--mount", number_of_values = 1)]
     pub(crate) mounts: Vec<Mount>,
 
-    /// Overrides the default control path '/~~penguin' with a custom path. Only
-    /// useful you need to use '/~~penguin' in your own application.
+    /// Overrides the default control path '/~~penguin' with a custom path.
+    ///
+    /// Only useful you need to use '/~~penguin' in your own application.
     #[structopt(long)]
     pub(crate) control_path: Option<String>,
 
