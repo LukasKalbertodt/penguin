@@ -7,7 +7,7 @@ use crate::{inject, Config, ProxyTarget};
 
 
 /// HTML content to reply in case an error occurs when connecting to the proxy.
-const PROXY_ERROR_HTML: &str = include_str!("assets/proxy-error.html");
+const PROXY_ERROR_HTML: &str = include_str!("../assets/proxy-error.html");
 
 /// Forwards the given request to the specified proxy target and returns its
 /// response.

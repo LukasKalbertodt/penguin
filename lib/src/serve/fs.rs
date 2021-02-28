@@ -4,7 +4,8 @@ use hyper::{Body, Request, Response};
 use tokio::fs;
 use tokio_util::codec::{FramedRead, BytesCodec};
 
-use crate::{inject, Config, server::{bad_request, not_found}};
+use crate::{inject, Config};
+use super::{bad_request, not_found};
 
 
 /// Checks if the request matches any `config.mounts` and returns an
@@ -68,7 +69,7 @@ async fn serve_dir(
     path: &Path,
     config: &Config,
 ) -> Result<Response<Body>, io::Error> {
-    const DIR_LISTING_HTML: &str = include_str!("assets/dir-listing.html");
+    const DIR_LISTING_HTML: &str = include_str!("../assets/dir-listing.html");
 
     // Collect all children of this folder.
     let mut folders = Vec::new();

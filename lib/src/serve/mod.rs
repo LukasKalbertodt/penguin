@@ -1,11 +1,13 @@
 use std::{convert::Infallible, future::Future, panic::AssertUnwindSafe, sync::Arc};
 
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::FutureExt;
 use hyper::{Body, Method, Request, Response, Server, StatusCode, http::uri::PathAndQuery, service::{make_service_fn, service_fn}};
-use hyper_tungstenite::{HyperWebsocket, tungstenite::Message};
-use tokio::sync::broadcast::{Receiver, Sender, error::RecvError};
+use tokio::sync::broadcast::Sender;
 
-use super::{Action, Config, Error, fileserver, proxy};
+use super::{Action, Config, Error};
+
+mod fs;
+mod proxy;
 
 
 pub(crate) async fn run(config: Config, actions: Sender<Action>) -> Result<(), Error> {
@@ -80,7 +82,7 @@ async fn handle(
 
     if req.uri().path().starts_with(&config.control_path) {
         handle_control(req, config, actions).await
-    } else if let Some(response) = fileserver::try_serve(&req, &config).await {
+    } else if let Some(response) = fs::try_serve(&req, &config).await {
         response
     } else if let Some(proxy) = &config.proxy {
         proxy::forward(req, proxy, config.clone()).await
@@ -103,7 +105,7 @@ async fn handle_control(
             Ok((response, websocket)) => {
                 // Spawn a task to handle the websocket connection.
                 let receiver = actions.subscribe();
-                tokio::spawn(handle_websocket(websocket, receiver));
+                tokio::spawn(crate::ws::handle_connection(websocket, receiver));
 
                 // Return the response so the spawned future can continue.
                 response
@@ -155,74 +157,7 @@ async fn handle_control(
     }
 }
 
-/// Function to handle a single websocket (listen for incoming `Action`s and
-/// stop if the WS connection is closed). There is one task per WS connection.
-async fn handle_websocket(websocket: HyperWebsocket, mut actions: Receiver<Action>) {
-    let mut websocket = match websocket.await {
-        Ok(ws) => ws,
-        Err(e) => {
-            log::warn!("failed to establish websocket connection: {}", e);
-            return;
-        }
-    };
-
-    loop {
-        tokio::select! {
-            action = actions.recv() => {
-                let data = match &action {
-                    // When all senders have closed, there is no reason to
-                    // continue keeping this task alive.
-                    Err(RecvError::Closed) => break,
-                    Err(RecvError::Lagged(skipped)) => {
-                        // I really can't imagine this happening: this would
-                        // mean this WS task was never awoken while many actions
-                        // were incoming.
-                        log::warn!(
-                            "Missed {} actions. This should not happen. \
-                                If you see this, please open an issue here: \
-                                https://github.com/LukasKalbertodt/penguin/issues",
-                            skipped,
-                        );
-                        continue;
-                    }
-                    Ok(Action::Reload) => {
-                        log::trace!("Sending reload WS command");
-                        "reload".to_string()
-                    }
-                    Ok(Action::Message(msg)) => {
-                        log::trace!("Sending message WS command");
-                        format!("message\n{}", msg)
-                    }
-                };
-
-                if let Err(e) = websocket.send(Message::text(data)).await {
-                    log::warn!("Failed to send WS message for action '{:?}': {}", action, e);
-                }
-            }
-
-            message = websocket.next() => {
-                match message {
-                    // If the WS connection was closed, we can just stop this
-                    // function.
-                    None | Some(Ok(Message::Close(_))) => break,
-
-                    Some(Err(e)) => {
-                        log::warn!(
-                            "Error receiving unexpected WS message. Shutting down \
-                                WS connection. Error: {}",
-                            e,
-                        );
-                        break;
-                    }
-
-                    _ => log::warn!("unexpected incoming WS message {:?}", message),
-                }
-            }
-        };
-    }
-}
-
-pub(crate) fn bad_request(msg: &'static str) -> Response<Body> {
+fn bad_request(msg: &'static str) -> Response<Body> {
     log::debug!("Replying BAD REQUEST: {}", msg);
 
     Response::builder()
@@ -231,7 +166,7 @@ pub(crate) fn bad_request(msg: &'static str) -> Response<Body> {
         .expect("bug: invalid response")
 }
 
-pub(crate) fn not_found() -> Response<Body> {
+fn not_found() -> Response<Body> {
     log::debug!("Responding with 404 NOT FOUND");
 
     Response::builder()

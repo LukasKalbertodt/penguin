@@ -5,10 +5,9 @@ use std::{fmt, future::Future, io, net::SocketAddr, pin::Pin, task};
 use tokio::sync::broadcast::{self, Sender};
 
 mod config;
-mod fileserver;
 mod inject;
-mod proxy;
-mod server;
+mod serve;
+mod ws;
 
 /// Reexport of `http` dependency.
 pub use hyper::http;
@@ -37,7 +36,7 @@ impl Server {
     pub fn build(config: Config) -> (Self, Controller) {
         let (sender, _) = broadcast::channel(ACTION_CHANNEL_SIZE);
         let controller = Controller(sender.clone());
-        let future = Box::pin(server::run(config, sender));
+        let future = Box::pin(serve::run(config, sender));
 
         (Self { future }, controller)
     }
