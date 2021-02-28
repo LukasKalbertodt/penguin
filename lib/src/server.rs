@@ -131,7 +131,6 @@ async fn handle_control(
                 // the event.
                 log::debug!("Received reload request via HTTP control API");
                 let _ = actions.send(Action::Reload);
-                // TODO: event
 
                 Response::new(Body::empty())
             }
@@ -150,7 +149,6 @@ async fn handle_control(
                         // the event.
                         log::debug!("Received message request via HTTP control API");
                         let _ = actions.send(Action::Message(s.into()));
-                        // TODO: event
 
                         Response::new(Body::empty())
                     }
