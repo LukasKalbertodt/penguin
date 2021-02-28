@@ -1,4 +1,6 @@
-use penguin::Server;
+use std::{env, path::Path};
+
+use penguin::{Config, Server};
 use structopt::StructOpt;
 
 use crate::args::{Args, Command};
@@ -34,10 +36,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     }
 
-    let (server, _controller) = builder.build()?;
+    let config = builder.validate()?;
+    let (server, _controller) = Server::build(config.clone());
 
-    bunt::println!("Penguin 🐧 is listening on {$yellow+intense+bold}http://{}{/$}", bind_addr);
+    // Nice output of what is being done
+    bunt::println!(
+        "{$bold}Penguin started!{/$} 🐧 is listening on {$yellow+intense+bold}http://{}{/$}",
+        bind_addr,
+    );
+    pretty_print_config(&config);
+
     server.await?;
 
     Ok(())
+}
+
+fn pretty_print_config(config: &Config) {
+    println!();
+    bunt::println!("    {$cyan+bold}Routing:{/$}");
+    bunt::println!(
+        "     ├╴ Requests to {[blue+intense]} are handled internally by penguin",
+        config.control_path(),
+    );
+
+    for mount in config.mounts() {
+        let fs_path = env::current_dir()
+            .as_deref()
+            .unwrap_or(Path::new("."))
+            .join(&mount.fs_path);
+
+        bunt::println!(
+            "     ├╴ Requests to {[blue+intense]} are served from the directory {[green]}",
+            mount.uri_path,
+            fs_path.display(),
+        );
+    }
+
+    if let Some(proxy) = config.proxy() {
+        bunt::println!("     ╰╴ All remaining requests forwarded to proxy '{}'", proxy);
+    } else {
+        bunt::println!("     ╰╴ All remaining requests will be responded to with 404");
+    }
+    println!();
 }
