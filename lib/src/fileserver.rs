@@ -36,20 +36,26 @@ async fn serve(
     fs_root: &Path,
     config: &Config,
 ) -> Response<Body> {
+    log::trace!("Serving request from file server...");
+
     let subpath = Path::new(subpath);
     let path = fs_root.join(subpath);
 
     if let Err(response) = check_directory_traversal_attack(&path, fs_root).await {
+        log::warn!("Directory traversal attack detected -> responding BAD REQUEST");
         return response;
     }
 
     if !path.exists() {
         not_found()
     } else if path.is_file() {
+        log::trace!("Serving requested file");
         serve_file(&path, config).await
     } else if path.join("index.html").is_file() {
+        log::trace!("Serving 'index.html' file in requested directory");
         serve_file(&path.join("index.html"), config).await
     } else {
+        log::trace!("Listing contents of directory...");
         serve_dir(req.uri().path(), &path, config)
             .await
             .expect("failed to read directory contents due to IO error")

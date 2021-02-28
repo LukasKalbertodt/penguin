@@ -1,7 +1,7 @@
 use std::{convert::Infallible, future::Future, panic::AssertUnwindSafe, sync::Arc};
 
 use futures::{FutureExt, SinkExt, StreamExt};
-use hyper::{Body, Method, Request, Response, Server, StatusCode, service::{make_service_fn, service_fn}};
+use hyper::{Body, Method, Request, Response, Server, StatusCode, http::uri::PathAndQuery, service::{make_service_fn, service_fn}};
 use hyper_tungstenite::{HyperWebsocket, tungstenite::Message};
 use tokio::sync::broadcast::{Receiver, Sender, error::RecvError};
 
@@ -25,8 +25,10 @@ pub(crate) async fn run(config: Config, actions: Sender<Action>) -> Result<(), E
         }
     });
 
+    log::info!("Creating hyper server");
     let server = Server::bind(&addr).serve(make_service);
 
+    log::info!("Start listening with hyper server");
     server.await?;
 
     Ok(())
@@ -57,6 +59,8 @@ async fn handle_internal_errors(
                 .map(|s| s.as_str())
                 .or(panic.downcast_ref::<&str>().map(|s| *s));
 
+            log::error!("HTTP handler panicked: {}", msg.unwrap_or("-"));
+
             Ok(internal_server_error(msg.unwrap_or("panic")))
         }
     }
@@ -68,6 +72,12 @@ async fn handle(
     config: Arc<Config>,
     actions: Sender<Action>,
 ) -> Response<Body> {
+    log::trace!(
+        "Incoming request: {:?} {}",
+        req.method(),
+        req.uri().path_and_query().unwrap_or(&PathAndQuery::from_static("/")),
+    );
+
     if req.uri().path().starts_with(&config.control_path) {
         handle_control(req, config, actions).await
     } else if let Some(response) = fileserver::try_serve(&req, &config).await {
@@ -85,7 +95,10 @@ async fn handle_control(
     config: Arc<Config>,
     actions: Sender<Action>,
 ) -> Response<Body> {
+    log::trace!("Handling request to HTTP control API...");
+
     if hyper_tungstenite::is_upgrade_request(&req) {
+        log::trace!("Handling WS upgrade request...");
         match hyper_tungstenite::upgrade(req, None) {
             Ok((response, websocket)) => {
                 // Spawn a task to handle the websocket connection.
@@ -105,6 +118,7 @@ async fn handle_control(
                 // looking at the code, I think an error here means that the
                 // request is invalid.
 
+                log::warn!("Invalid WS upgrade request");
                 bad_request("Failed to upgrade to WS connection\n")
             }
         }
@@ -115,6 +129,7 @@ async fn handle_control(
                 // We ignore errors here: if there are no receivers, so be it.
                 // Although we might want to include the number of receivers in
                 // the event.
+                log::debug!("Received reload request via HTTP control API");
                 let _ = actions.send(Action::Reload);
                 // TODO: event
 
@@ -133,6 +148,7 @@ async fn handle_control(
                         // We ignore errors here: if there are no receivers, so be it.
                         // Although we might want to include the number of receivers in
                         // the event.
+                        log::debug!("Received message request via HTTP control API");
                         let _ = actions.send(Action::Message(s.into()));
                         // TODO: event
 
@@ -165,8 +181,14 @@ async fn handle_websocket(
                         // TODO: handle this somehow?
                         continue;
                     }
-                    Ok(Action::Reload) => "reload".to_string(),
-                    Ok(Action::Message(msg)) => format!("message\n{}", msg),
+                    Ok(Action::Reload) => {
+                        log::trace!("Sending reload WS command");
+                        "reload".to_string()
+                    }
+                    Ok(Action::Message(msg)) => {
+                        log::trace!("Sending message WS command");
+                        format!("message\n{}", msg)
+                    }
                 };
 
                 websocket.send(Message::text(data)).await?;
@@ -192,7 +214,9 @@ async fn handle_websocket(
     Ok(())
 }
 
-pub(crate) fn bad_request(msg: impl Into<Body>) -> Response<Body> {
+pub(crate) fn bad_request(msg: &'static str) -> Response<Body> {
+    log::debug!("Replying BAD REQUEST: {}", msg);
+
     Response::builder()
         .status(StatusCode::BAD_REQUEST)
         .body(msg.into())
@@ -200,6 +224,8 @@ pub(crate) fn bad_request(msg: impl Into<Body>) -> Response<Body> {
 }
 
 pub(crate) fn not_found() -> Response<Body> {
+    log::debug!("Responding with 404 NOT FOUND");
+
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .body(Body::from("Not found\n"))

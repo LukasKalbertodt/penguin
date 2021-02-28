@@ -9,6 +9,8 @@ mod args;
 // A single thread runtime is plenty enough for a webserver purpose.
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    pretty_env_logger::init();
+
     // Parse CLI arguments.
     let args = Args::from_args();
 
