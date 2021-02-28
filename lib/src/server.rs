@@ -1,6 +1,6 @@
-use std::{convert::Infallible, sync::Arc};
+use std::{convert::Infallible, future::Future, panic::AssertUnwindSafe, sync::Arc};
 
-use futures::{SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 use hyper::{Body, Method, Request, Response, Server, StatusCode, service::{make_service_fn, service_fn}};
 use hyper_tungstenite::{HyperWebsocket, tungstenite::Message};
 use tokio::sync::broadcast::{Receiver, Sender, error::RecvError};
@@ -18,7 +18,9 @@ pub(crate) async fn run(config: Config, actions: Sender<Action>) -> Result<(), E
 
         async {
             Ok::<_, Infallible>(service_fn(move |req| {
-                handle(req, Arc::clone(&config), actions.clone())
+                handle_internal_errors(
+                    handle(req, Arc::clone(&config), actions.clone())
+                )
             }))
         }
     });
@@ -30,13 +32,43 @@ pub(crate) async fn run(config: Config, actions: Sender<Action>) -> Result<(), E
     Ok(())
 }
 
+async fn handle_internal_errors(
+    future: impl Future<Output = Response<Body>>,
+) -> Result<Response<Body>, Infallible> {
+    fn internal_server_error(msg: &str) -> Response<Body> {
+        let body = format!("Internal server error: this is a bug in Penguin!\n\n{}\n", msg);
+        Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(body.into())
+            .unwrap()
+    }
+
+    // The `AssertUnwindSafe` is unfortunately necessary. The whole story of
+    // unwind safety is strange. What we are basically saying here is: "if the
+    // future panicks, the global/remaining application state is not 'broken'.
+    // It is safe to continue with the program in case of a panic."
+    match AssertUnwindSafe(future).catch_unwind().await {
+        Ok(response) => Ok(response),
+        Err(panic) => {
+            // The `panic` information is just an `Any` object representing the
+            // value the panic was invoked with. For most panics (which use
+            // `panic!` like `println!`), this is either `&str` or `String`.
+            let msg = panic.downcast_ref::<String>()
+                .map(|s| s.as_str())
+                .or(panic.downcast_ref::<&str>().map(|s| *s));
+
+            Ok(internal_server_error(msg.unwrap_or("panic")))
+        }
+    }
+}
+
 /// Handles a single incoming request.
 async fn handle(
     req: Request<Body>,
     config: Arc<Config>,
     actions: Sender<Action>,
-) -> Result<Response<Body>, Error> {
-    let response = if req.uri().path().starts_with(&config.control_path) {
+) -> Response<Body> {
+    if req.uri().path().starts_with(&config.control_path) {
         handle_control(req, config, actions).await
     } else if let Some(response) = fileserver::try_serve(&req, &config).await {
         response
@@ -44,9 +76,7 @@ async fn handle(
         proxy::forward(req, proxy, config.clone()).await
     } else {
         not_found()
-    };
-
-    Ok(response)
+    }
 }
 
 /// Handles "control requests", i.e. request to the control path.
