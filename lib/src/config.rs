@@ -40,13 +40,7 @@ pub struct Config {
     /// static file server.
     ///
     /// Has to start with `/` and *not* include the trailing `/`.
-    ///
-    /// TODO: maybe allow using a separate port instead of a control path.
     pub(crate) control_path: String,
-
-    // TODO:
-    // - callback
-    // - string/name of service ("floof") for error pages
 }
 
 impl Config {
