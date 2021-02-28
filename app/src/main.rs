@@ -11,10 +11,10 @@ mod args;
 // A single thread runtime is plenty enough for a webserver purpose.
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    pretty_env_logger::init();
-
     // Parse CLI arguments.
     let args = Args::from_args();
+
+    init_logger();
 
     // Build Penguin configuration from arguments.
     let bind_addr = (args.bind, args.port).into();
@@ -49,6 +49,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     server.await?;
 
     Ok(())
+}
+
+fn init_logger() {
+    if env::var("RUST_LOG") == Err(env::VarError::NotPresent) {
+        env::set_var("RUST_LOG", "penguin=warn");
+    }
+
+    pretty_env_logger::init();
 }
 
 fn pretty_print_config(config: &Config) {
