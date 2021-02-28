@@ -7,7 +7,8 @@ use penguin::ProxyTarget;
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "Penguin",
-    about = "Language-agnostic dev server that can serve directories and act as a proxy.",
+    about = "Language-agnostic dev server that can serve directories and forward \
+        requests to a proxy.",
     setting(structopt::clap::AppSettings::VersionlessSubcommands),
 )]
 pub(crate) struct Args {
@@ -26,6 +27,11 @@ pub(crate) struct Args {
     /// subcommand.
     #[structopt(long = "--mount", number_of_values = 1)]
     pub(crate) mounts: Vec<Mount>,
+
+    /// Overrides the default control path '/~~penguin' with a custom path. Only
+    /// useful you need to use '/~~penguin' in your own application.
+    #[structopt(long)]
+    pub(crate) control_path: Option<String>,
 
     #[structopt(subcommand)]
     pub(crate) cmd: Command,

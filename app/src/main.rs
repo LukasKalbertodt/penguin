@@ -22,6 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for mount in &args.mounts {
         builder = builder.add_mount(&mount.uri_path, &mount.fs_path)?;
     }
+    if let Some(control_path) = args.control_path {
+        builder = builder.set_control_path(control_path);
+    }
     match args.cmd {
         Command::Proxy { target } => builder = builder.proxy(target),
         Command::Serve { path: Some(path) } => builder = builder.add_mount("/", &path)?,
