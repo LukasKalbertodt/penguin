@@ -153,7 +153,7 @@ impl Builder {
     }
 }
 
-/// Reasons for an incorrect configuration.
+/// Configuration validation error.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ConfigError {
@@ -174,6 +174,10 @@ pub enum ConfigError {
 /// To create this type you can:
 /// - use the `FromStr` impl: `"http://localhost:8000".parse()`, or
 /// - use the `From<(Scheme, Authority)>` impl.
+///
+/// The `FromStr` allows omitting the scheme ('http' or 'https') when the host
+/// is `"localhost"`, `"127.0.0.1"` or `"::1"` and defaults to 'http' in that
+/// case. For all other hosts, the scheme has to be specified.
 #[derive(Debug, Clone)]
 pub struct ProxyTarget {
     pub(crate) scheme: uri::Scheme,
@@ -195,33 +199,49 @@ impl fmt::Display for ProxyTarget {
 }
 
 impl FromStr for ProxyTarget {
-    type Err = ProxyTargetError;
+    type Err = ProxyTargetParseError;
     fn from_str(src: &str) -> Result<Self, Self::Err> {
         let parts = src.parse::<Uri>()?.into_parts();
         let has_real_path = parts.path_and_query.as_ref()
             .map_or(false, |pq| !pq.as_str().is_empty() && pq.as_str() != "/");
         if has_real_path {
-            return Err(ProxyTargetError::HasPath);
+            return Err(ProxyTargetParseError::HasPath);
         }
 
-        Ok(Self {
-            scheme: parts.scheme.ok_or(ProxyTargetError::MissingScheme)?,
-            authority: parts.authority.ok_or(ProxyTargetError::MissingAuthority)?,
-        })
+        let authority = parts.authority.ok_or(ProxyTargetParseError::MissingAuthority)?;
+        let scheme = parts.scheme
+            .or_else(|| {
+                if ["localhost", "127.0.0.1", "::1"].contains(&authority.host()) {
+                    Some(uri::Scheme::HTTP)
+                } else {
+                    None
+                }
+            })
+            .ok_or(ProxyTargetParseError::MissingScheme)?;
+
+        Ok(Self { scheme, authority })
     }
 }
 
+/// Error that can occur when parsing a `ProxyTarget` from a string.
 #[derive(Debug, thiserror::Error)]
-pub enum ProxyTargetError {
+#[non_exhaustive]
+pub enum ProxyTargetParseError {
+    /// The string could not be parsed as `http::Uri`.
     #[error("invalid URI: {0}")]
     InvalidUri(#[from] uri::InvalidUri),
 
+    /// The parsed URL has a path, but a proxy target must not have a path.
     #[error("proxy target has path which is not allowed")]
     HasPath,
 
-    #[error("proxy target has no scheme ('http' or 'https') specified")]
+    /// The URI does not have a scheme ('http' or 'https') specified when it
+    /// should have.
+    #[error("proxy target has no scheme ('http' or 'https') specified, but a \
+        scheme must be specified for non-local targets")]
     MissingScheme,
 
+    /// The URI does not have an authority (≈ "host"), but it needs one.
     #[error("proxy target has no authority (\"host\") specified")]
     MissingAuthority,
 }

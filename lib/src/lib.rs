@@ -13,7 +13,7 @@ mod server;
 /// Reexport of `http` dependency.
 pub use hyper::http;
 
-pub use config::{Builder, Config, Mount, ProxyTarget, ProxyTargetError};
+pub use config::{Builder, Config, ConfigError, Mount, ProxyTarget, ProxyTargetParseError};
 
 /// Penguin server: the main type of this library.
 ///
