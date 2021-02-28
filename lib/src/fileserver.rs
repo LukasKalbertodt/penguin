@@ -109,10 +109,10 @@ async fn serve_dir(uri_path: &str, path: &Path, config: &Config) -> Result<Respo
     files.sort();
 
     // Build list of children.
-    let mut entries = String::new();
+    let mut entries = String::from("\n");
     for (name, is_mount) in folders.into_iter().chain(files) {
         entries.push_str(&format!(
-            r#"<li><a href="{0}" class="{1}"><code>{0}</code></a></li>"#,
+            "<li><a href=\"{0}\" class=\"{1}\"><code>{0}</code></a></li>\n",
             name,
             if is_mount { "mount" } else { "real" },
         ));
