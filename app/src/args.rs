@@ -13,14 +13,14 @@ use penguin::ProxyTarget;
 )]
 pub(crate) struct Args {
     /// The port that the Penguin server listens on.
-    #[structopt(short, long, default_value = "4090")]
+    #[structopt(short, long, default_value = "4090", global = true)]
     pub(crate) port: u16,
 
     /// Address to bind to.
     ///
     /// Mostly useful to set to "0.0.0.0" to let other
     /// devices in your network access the server.
-    #[structopt(long, default_value = "127.0.0.1")]
+    #[structopt(long, default_value = "127.0.0.1", global = true)]
     pub(crate) bind: IpAddr,
 
     /// Mount a directory on an URI path: '--mount <uri>:<path>'.
@@ -28,13 +28,13 @@ pub(crate) struct Args {
     /// Example: '--mount assets:/home/peter/images'. Can be specified multiple
     /// times. If you only want to mount one directory in the root, rather use
     /// the `penguin serve` subcommand.
-    #[structopt(long = "--mount", number_of_values = 1)]
+    #[structopt(long = "--mount", number_of_values = 1, global = true)]
     pub(crate) mounts: Vec<Mount>,
 
     /// Overrides the default control path '/~~penguin' with a custom path.
     ///
     /// Only useful you need to use '/~~penguin' in your own application.
-    #[structopt(long)]
+    #[structopt(long, global = true)]
     pub(crate) control_path: Option<String>,
 
     #[structopt(subcommand)]
