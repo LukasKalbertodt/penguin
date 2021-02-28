@@ -37,11 +37,11 @@ async fn handle(
     actions: Sender<Action>,
 ) -> Result<Response<Body>, Error> {
     let response = if req.uri().path().starts_with(&config.control_path) {
-        handle_control(req, config, actions).await?
+        handle_control(req, config, actions).await
     } else if let Some(response) = fileserver::try_serve(&req, &config).await? {
         response
     } else if let Some(proxy) = &config.proxy {
-        proxy::forward(req, proxy, config.clone()).await?
+        proxy::forward(req, proxy, config.clone()).await
     } else {
         Response::builder()
             .status(StatusCode::NOT_FOUND)
@@ -57,20 +57,30 @@ async fn handle_control(
     req: Request<Body>,
     config: Arc<Config>,
     actions: Sender<Action>,
-) -> Result<Response<Body>, Error> {
-    let response = if hyper_tungstenite::is_upgrade_request(&req) {
-        let (response, websocket) = hyper_tungstenite::upgrade(req, None)?;
+) -> Response<Body> {
+    if hyper_tungstenite::is_upgrade_request(&req) {
+        match hyper_tungstenite::upgrade(req, None) {
+            Ok((response, websocket)) => {
+                // Spawn a task to handle the websocket connection.
+                tokio::spawn(async move {
+                    let receiver = actions.subscribe();
+                    if let Err(e) = handle_websocket(websocket, receiver).await {
+                        // TODO
+                        eprintln!("Error in websocket connection: {}", e);
+                    }
+                });
 
-        // Spawn a task to handle the websocket connection.
-        tokio::spawn(async move {
-            let receiver = actions.subscribe();
-            if let Err(e) = handle_websocket(websocket, receiver).await {
-                eprintln!("Error in websocket connection: {}", e);
+                // Return the response so the spawned future can continue.
+                response
             }
-        });
+            Err(_) => {
+                // TODO: `upgrade` does not guarantee this (yet), but from
+                // looking at the code, I think an error here means that the
+                // request is invalid.
 
-        // Return the response so the spawned future can continue.
-        response
+                bad_request("Failed to upgrade to WS connection")
+            }
+        }
     } else {
         let subpath = req.uri().path().strip_prefix(&config.control_path).unwrap();
         match (req.method(), subpath) {
@@ -86,15 +96,12 @@ async fn handle_control(
 
             (&Method::POST, "/message") => {
                 let (_, body) = req.into_parts();
-                let body = hyper::body::to_bytes(body).await?;
+                let body = hyper::body::to_bytes(body)
+                    .await
+                    .expect("failed to download message body");
 
                 match std::str::from_utf8(&body) {
-                    Err(_) => {
-                        Response::builder()
-                            .status(StatusCode::BAD_REQUEST)
-                            .body(Body::from("Bad request: request body is not UTF8"))
-                            .expect("bug: invalid response")
-                    }
+                    Err(_) => bad_request("Bad request: request body is not UTF8"),
                     Ok(s) => {
                         // We ignore errors here: if there are no receivers, so be it.
                         // Although we might want to include the number of receivers in
@@ -107,16 +114,9 @@ async fn handle_control(
                 }
             }
 
-            _ => {
-                Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from("Invalid request to libpenguin control path"))
-                    .expect("bug: invalid response")
-            }
+            _ => bad_request("Invalid request to libpenguin control path"),
         }
-    };
-
-    Ok(response)
+    }
 }
 
 /// Function to handle a single websocket (listen for incoming `Action`s and
@@ -163,4 +163,11 @@ async fn handle_websocket(
     }
 
     Ok(())
+}
+
+fn bad_request(msg: impl Into<Body>) -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .body(msg.into())
+        .expect("bug: invalid response")
 }

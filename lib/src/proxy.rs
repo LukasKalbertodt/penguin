@@ -3,7 +3,7 @@ use std::sync::Arc;
 use hyper::{Body, Client, Request, Response, StatusCode, Uri, header};
 use hyper_tls::HttpsConnector;
 
-use crate::{inject, Config, Error, ProxyTarget};
+use crate::{inject, Config, ProxyTarget};
 
 
 /// HTML content to reply in case an error occurs when connecting to the proxy.
@@ -18,7 +18,7 @@ pub(crate) async fn forward(
     mut req: Request<Body>,
     target: &ProxyTarget,
     config: Arc<Config>,
-) -> Result<Response<Body>, Error> {
+) -> Response<Body> {
     // Build new URI and change the given request.
     let uri = {
         let mut parts = req.uri().clone().into_parts();
@@ -29,14 +29,20 @@ pub(crate) async fn forward(
     *req.uri_mut() = uri.clone();
 
     let client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
-    let response = match client.request(req).await {
+    match client.request(req).await {
         Ok(response) => {
             let content_type = response.headers().get(header::CONTENT_TYPE);
             if content_type.map_or(false, |v| v.as_ref().starts_with(b"text/html")) {
                 // The response is HTML: we need to download it completely and
                 // inject our script.
                 let (parts, body) = response.into_parts();
-                let body = hyper::body::to_bytes(body).await?;
+                let body = match hyper::body::to_bytes(body).await {
+                    Ok(body) => body,
+                    Err(e) => {
+                        let msg = format!("Failed to download response from {}\n\n{}", uri, e);
+                        return gateway_error(&msg, e, &config);
+                    }
+                };
 
                 let new_body = inject::into(&body, &config);
                 let new_len = new_body.len();
@@ -54,23 +60,25 @@ pub(crate) async fn forward(
 
         Err(e) => {
             let msg = format!("Failed to reach {}\n\n{}", uri, e);
-            let html = PROXY_ERROR_HTML
-                .replace("{{ error }}", &msg)
-                .replace("{{ reload_script }}", &inject::script(&config));
-
-            let status = if e.is_timeout() {
-                StatusCode::GATEWAY_TIMEOUT
-            } else {
-                StatusCode::BAD_GATEWAY
-            };
-
-            Response::builder()
-                .status(status)
-                .header("Content-Type", "text/html")
-                .body(html.into())
-                .unwrap()
+            gateway_error(&msg, e, &config)
         }
+    }
+}
+
+fn gateway_error(msg: &str, e: hyper::Error, config: &Config) -> Response<Body> {
+    let html = PROXY_ERROR_HTML
+        .replace("{{ error }}", msg)
+        .replace("{{ reload_script }}", &inject::script(config));
+
+    let status = if e.is_timeout() {
+        StatusCode::GATEWAY_TIMEOUT
+    } else {
+        StatusCode::BAD_GATEWAY
     };
 
-    Ok(response)
+    Response::builder()
+        .status(status)
+        .header("Content-Type", "text/html")
+        .body(html.into())
+        .unwrap()
 }
