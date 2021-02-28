@@ -1,10 +1,10 @@
-use std::path::Path;
+use std::{io::{self, ErrorKind}, path::Path};
 
-use hyper::{Body, Request, Response, StatusCode};
+use hyper::{Body, Request, Response};
 use tokio::fs;
 use tokio_util::codec::{FramedRead, BytesCodec};
 
-use crate::{inject, Config, Error};
+use crate::{inject, Config, server::{bad_request, not_found}};
 
 
 /// Checks if the request matches any `config.mounts` and returns an
@@ -12,8 +12,8 @@ use crate::{inject, Config, Error};
 pub(crate) async fn try_serve(
     req: &Request<Body>,
     config: &Config,
-) -> Result<Option<Response<Body>>, Error> {
-    let dir = config.mounts.iter()
+) -> Option<Response<Body>> {
+    let (subpath, sd) = config.mounts.iter()
         .filter_map(|sd| {
             req.uri()
                 .path()
@@ -25,12 +25,9 @@ pub(crate) async fn try_serve(
         })
 
         // We want the "most specific" mount, so the longest URI path wins.
-        .max_by_key(|(_, sd)| sd.uri_path.len());
+        .max_by_key(|(_, sd)| sd.uri_path.len())?;
 
-    match dir {
-        Some((subpath, sd)) => serve(req, &subpath, &sd.fs_path, config).await.map(Some),
-        None => Ok(None),
-    }
+    Some(serve(req, &subpath, &sd.fs_path, config).await)
 }
 
 async fn serve(
@@ -38,39 +35,33 @@ async fn serve(
     subpath: &str,
     fs_root: &Path,
     config: &Config,
-) -> Result<Response<Body>, Error> {
+) -> Response<Body> {
     let subpath = Path::new(subpath);
     let path = fs_root.join(subpath);
 
-    // Check that the resulting file we serve is actually a child of the root
-    // directory, i.e. protect against path traversal attacks.
-    if !fs::canonicalize(&path).await?.starts_with(fs::canonicalize(fs_root).await?) {
-        let bad_req = Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::from("Bad request: requested file outside of served directory"))
-            .expect("bug: invalid response");
-
-        return Ok(bad_req);
+    if let Err(response) = check_directory_traversal_attack(&path, fs_root).await {
+        return response;
     }
 
-    let response = if !path.exists() {
-        Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::from("Not found"))
-            .expect("bug: invalid response")
+    if !path.exists() {
+        not_found()
     } else if path.is_file() {
-        serve_file(&path, config).await?
+        serve_file(&path, config).await
     } else if path.join("index.html").is_file() {
-        serve_file(&path.join("index.html"), config).await?
+        serve_file(&path.join("index.html"), config).await
     } else {
-        serve_dir(req.uri().path(), &path, config).await?
-    };
-
-    Ok(response)
+        serve_dir(req.uri().path(), &path, config)
+            .await
+            .expect("failed to read directory contents due to IO error")
+    }
 }
 
 /// Lists the contents of a directory.
-async fn serve_dir(uri_path: &str, path: &Path, config: &Config) -> Result<Response<Body>, Error> {
+async fn serve_dir(
+    uri_path: &str,
+    path: &Path,
+    config: &Config,
+) -> Result<Response<Body>, io::Error> {
     const DIR_LISTING_HTML: &str = include_str!("assets/dir-listing.html");
 
     // Collect all children of this folder.
@@ -132,21 +123,22 @@ async fn serve_dir(uri_path: &str, path: &Path, config: &Config) -> Result<Respo
 }
 
 /// Serves a single file. If it's a HTML file, our JS code is injected.
-async fn serve_file(path: &Path, config: &Config) -> Result<Response<Body>, Error> {
+async fn serve_file(path: &Path, config: &Config) -> Response<Body> {
+    // TODO: maybe we should return 403 if the file can't be read due to
+    // permissions?
+
     let mime = mime_guess::from_path(&path).first();
     if mime.as_ref().map_or(false, |mime| mime.as_ref().starts_with("text/html")) {
-        let raw = fs::read(path).await?;
+        let raw = fs::read(path).await.expect("failed to read file");
         let html = inject::into(&raw, &config);
 
-        Ok(
-            Response::builder()
-                .header("Content-Type", "text/html")
-                .header("Content-Length", html.len().to_string())
-                .body(html.into())
-                .expect("bug: invalid response")
-        )
+        Response::builder()
+            .header("Content-Type", "text/html")
+            .header("Content-Length", html.len().to_string())
+            .body(html.into())
+            .expect("bug: invalid response")
     } else {
-        let file = fs::File::open(path).await?;
+        let file = fs::File::open(path).await.expect("failed to open file");
         let body = Body::wrap_stream(FramedRead::new(file, BytesCodec::new()));
 
         let mut response = Response::builder();
@@ -154,6 +146,26 @@ async fn serve_file(path: &Path, config: &Config) -> Result<Response<Body>, Erro
             response = response.header("Content-Type", mime.to_string());
         }
 
-        Ok(response.body(body).expect("bug: invalid response"))
+        response.body(body).expect("bug: invalid response")
     }
+}
+
+/// Protects against directory traversal attacks
+async fn check_directory_traversal_attack(path: &Path, fs_root: &Path) -> Result<(), Response<Body>> {
+    fn map_error(e: io::Error) -> Response<Body> {
+        if e.kind() == ErrorKind::NotFound {
+            not_found()
+        } else {
+            panic!("could not canonicalize path");
+        }
+    }
+
+    let canonical_req = fs::canonicalize(path).await.map_err(map_error)?;
+    let canonical_root = fs::canonicalize(fs_root).await.map_err(map_error)?;
+
+    if !canonical_req.starts_with(canonical_root) {
+        return Err(bad_request("Bad request: requested file outside of served directory\n"));
+    }
+
+    Ok(())
 }

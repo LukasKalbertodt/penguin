@@ -38,15 +38,12 @@ async fn handle(
 ) -> Result<Response<Body>, Error> {
     let response = if req.uri().path().starts_with(&config.control_path) {
         handle_control(req, config, actions).await
-    } else if let Some(response) = fileserver::try_serve(&req, &config).await? {
+    } else if let Some(response) = fileserver::try_serve(&req, &config).await {
         response
     } else if let Some(proxy) = &config.proxy {
         proxy::forward(req, proxy, config.clone()).await
     } else {
-        Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::from("Not found"))
-            .expect("bug: invalid response")
+        not_found()
     };
 
     Ok(response)
@@ -78,7 +75,7 @@ async fn handle_control(
                 // looking at the code, I think an error here means that the
                 // request is invalid.
 
-                bad_request("Failed to upgrade to WS connection")
+                bad_request("Failed to upgrade to WS connection\n")
             }
         }
     } else {
@@ -101,7 +98,7 @@ async fn handle_control(
                     .expect("failed to download message body");
 
                 match std::str::from_utf8(&body) {
-                    Err(_) => bad_request("Bad request: request body is not UTF8"),
+                    Err(_) => bad_request("Bad request: request body is not UTF8\n"),
                     Ok(s) => {
                         // We ignore errors here: if there are no receivers, so be it.
                         // Although we might want to include the number of receivers in
@@ -114,7 +111,7 @@ async fn handle_control(
                 }
             }
 
-            _ => bad_request("Invalid request to libpenguin control path"),
+            _ => bad_request("Invalid request to libpenguin control path\n"),
         }
     }
 }
@@ -165,9 +162,16 @@ async fn handle_websocket(
     Ok(())
 }
 
-fn bad_request(msg: impl Into<Body>) -> Response<Body> {
+pub(crate) fn bad_request(msg: impl Into<Body>) -> Response<Body> {
     Response::builder()
         .status(StatusCode::BAD_REQUEST)
         .body(msg.into())
+        .expect("bug: invalid response")
+}
+
+pub(crate) fn not_found() -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::from("Not found\n"))
         .expect("bug: invalid response")
 }
