@@ -102,13 +102,8 @@ async fn handle_control(
         match hyper_tungstenite::upgrade(req, None) {
             Ok((response, websocket)) => {
                 // Spawn a task to handle the websocket connection.
-                tokio::spawn(async move {
-                    let receiver = actions.subscribe();
-                    if let Err(e) = handle_websocket(websocket, receiver).await {
-                        // TODO
-                        eprintln!("Error in websocket connection: {}", e);
-                    }
-                });
+                let receiver = actions.subscribe();
+                tokio::spawn(handle_websocket(websocket, receiver));
 
                 // Return the response so the spawned future can continue.
                 response
@@ -162,16 +157,19 @@ async fn handle_control(
 
 /// Function to handle a single websocket (listen for incoming `Action`s and
 /// stop if the WS connection is closed). There is one task per WS connection.
-async fn handle_websocket(
-    websocket: HyperWebsocket,
-    mut actions: Receiver<Action>,
-) -> Result<(), Error> {
-    let mut websocket = websocket.await?;
+async fn handle_websocket(websocket: HyperWebsocket, mut actions: Receiver<Action>) {
+    let mut websocket = match websocket.await {
+        Ok(ws) => ws,
+        Err(e) => {
+            log::warn!("failed to establish websocket connection: {}", e);
+            return;
+        }
+    };
 
     loop {
         tokio::select! {
             action = actions.recv() => {
-                let data = match action {
+                let data = match &action {
                     // When all senders have closed, there is no reason to
                     // continue keeping this task alive.
                     Err(RecvError::Closed) => break,
@@ -197,27 +195,31 @@ async fn handle_websocket(
                     }
                 };
 
-                websocket.send(Message::text(data)).await?;
+                if let Err(e) = websocket.send(Message::text(data)).await {
+                    log::warn!("Failed to send WS message for action '{:?}': {}", action, e);
+                }
             }
 
             message = websocket.next() => {
                 match message {
-                    Some(Err(e)) => Err(e)?,
-
                     // If the WS connection was closed, we can just stop this
                     // function.
                     None | Some(Ok(Message::Close(_))) => break,
 
-                    _ => {
-                        // TODO
-                        println!("warn: unexpected message {:?}", message);
+                    Some(Err(e)) => {
+                        log::warn!(
+                            "Error receiving unexpected WS message. Shutting down \
+                                WS connection. Error: {}",
+                            e,
+                        );
+                        break;
                     }
+
+                    _ => log::warn!("unexpected incoming WS message {:?}", message),
                 }
             }
         };
     }
-
-    Ok(())
 }
 
 pub(crate) fn bad_request(msg: &'static str) -> Response<Body> {
