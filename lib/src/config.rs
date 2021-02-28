@@ -106,14 +106,7 @@ impl Builder {
         fs_path: impl Into<PathBuf>,
     ) -> Result<Self, ConfigError> {
         let mut uri_path = uri_path.into();
-
-        // Normalize URI path.
-        if uri_path.len() > 1 && uri_path.ends_with('/') {
-            uri_path.pop();
-        }
-        if !uri_path.starts_with('/') {
-            uri_path.insert(0, '/');
-        }
+        normalize_path(&mut uri_path);
 
         if self.0.mounts.iter().any(|other| other.uri_path == uri_path) {
             return Err(ConfigError::DuplicateUriPath(uri_path));
@@ -125,6 +118,13 @@ impl Builder {
         });
 
         Ok(self)
+    }
+
+    /// Overrides the control path (`/~~penguin` by default) with a custom path.
+    pub fn set_control_path(mut self, path: impl Into<String>) -> Self {
+        self.0.control_path = path.into();
+        normalize_path(&mut self.0.control_path);
+        self
     }
 
     /// Validates the configuration and builds the server and controller from
@@ -144,6 +144,15 @@ impl Builder {
         }
 
         Ok(self.0)
+    }
+}
+
+fn normalize_path(path: &mut String) {
+    if path.len() > 1 && path.ends_with('/') {
+        path.pop();
+    }
+    if !path.starts_with('/') {
+        path.insert(0, '/');
     }
 }
 
