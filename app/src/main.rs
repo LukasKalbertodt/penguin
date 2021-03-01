@@ -64,7 +64,7 @@ fn init_logger() {
 
 fn pretty_print_config(config: &Config) {
     println!();
-    bunt::println!("    {$cyan+bold}Routing:{/$}");
+    bunt::println!("   {$cyan+bold}▸ Routing:{/$}");
     bunt::println!(
         "     ├╴ Requests to {[blue+intense]} are handled internally by penguin",
         config.control_path(),
@@ -84,7 +84,7 @@ fn pretty_print_config(config: &Config) {
     }
 
     if let Some(proxy) = config.proxy() {
-        bunt::println!("     ╰╴ All remaining requests forwarded to proxy '{}'", proxy);
+        bunt::println!("     ╰╴ All remaining requests are forwarded to {[green+intense]}", proxy);
     } else {
         bunt::println!("     ╰╴ All remaining requests will be responded to with 404");
     }
