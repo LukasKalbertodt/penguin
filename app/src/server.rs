@@ -1,0 +1,71 @@
+use std::{env, path::Path};
+
+use penguin::{Config, Mount, ProxyTarget, Server};
+
+use crate::args::{Args, ServeOptions};
+
+
+
+pub(crate) async fn run(
+    proxy: Option<&ProxyTarget>,
+    mounts: impl Iterator<Item = &Mount>,
+    options: &ServeOptions,
+    args: &Args,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let bind_addr = (options.bind, args.port).into();
+    let mut builder = Server::bind(bind_addr);
+
+    for mount in mounts {
+        builder = builder.add_mount(&mount.uri_path, &mount.fs_path)?;
+    }
+    if let Some(control_path) = &args.control_path {
+        builder = builder.set_control_path(control_path);
+    }
+    if let Some(target) = proxy {
+        builder = builder.proxy(target.clone())
+    }
+
+
+    let config = builder.validate()?;
+    let (server, _controller) = Server::build(config.clone());
+
+    // Nice output of what is being done
+    bunt::println!(
+        "{$bold}Penguin started!{/$} Listening on {$yellow+intense+bold}http://{}{/$}",
+        bind_addr,
+    );
+    pretty_print_config(&config);
+
+    server.await?;
+
+    Ok(())
+}
+
+fn pretty_print_config(config: &Config) {
+    println!();
+    bunt::println!("   {$cyan+bold}▸ Routing:{/$}");
+    bunt::println!(
+        "     ├╴ Requests to {[blue+intense]} are handled internally by penguin",
+        config.control_path(),
+    );
+
+    for mount in config.mounts() {
+        let fs_path = env::current_dir()
+            .as_deref()
+            .unwrap_or(Path::new("."))
+            .join(&mount.fs_path);
+
+        bunt::println!(
+            "     ├╴ Requests to {[blue+intense]} are served from the directory {[green]}",
+            mount.uri_path,
+            fs_path.display(),
+        );
+    }
+
+    if let Some(proxy) = config.proxy() {
+        bunt::println!("     ╰╴ All remaining requests are forwarded to {[green+intense]}", proxy);
+    } else {
+        bunt::println!("     ╰╴ All remaining requests will be responded to with 404");
+    }
+    println!();
+}

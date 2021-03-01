@@ -1,7 +1,7 @@
-use std::{net::IpAddr, path::{Path, PathBuf}, str::FromStr};
+use std::{net::IpAddr, path::{Path, PathBuf}};
 
 use structopt::StructOpt;
-use penguin::ProxyTarget;
+use penguin::{Mount, ProxyTarget};
 
 
 #[derive(Debug, StructOpt)]
@@ -15,21 +15,6 @@ pub(crate) struct Args {
     /// The port that the Penguin server listens on.
     #[structopt(short, long, default_value = "4090", global = true)]
     pub(crate) port: u16,
-
-    /// Address to bind to.
-    ///
-    /// Mostly useful to set to "0.0.0.0" to let other
-    /// devices in your network access the server.
-    #[structopt(long, default_value = "127.0.0.1", global = true)]
-    pub(crate) bind: IpAddr,
-
-    /// Mount a directory on an URI path: '--mount <uri>:<path>'.
-    ///
-    /// Example: '--mount assets:/home/peter/images'. Can be specified multiple
-    /// times. If you only want to mount one directory in the root, rather use
-    /// the `penguin serve` subcommand.
-    #[structopt(short, long = "--mount", number_of_values = 1, global = true)]
-    pub(crate) mounts: Vec<Mount>,
 
     /// Overrides the default control path '/~~penguin' with a custom path.
     ///
@@ -50,35 +35,55 @@ pub(crate) enum Command {
     /// directory via '--mount'.
     Serve {
         #[structopt(parse(from_os_str))]
-        path: Option<PathBuf>
+        path: Option<PathBuf>,
+
+        #[structopt(flatten)]
+        options: ServeOptions,
     },
 
     /// Starts a server forwarding all request to the specified target address.
     Proxy {
         target: ProxyTarget,
+
+        #[structopt(flatten)]
+        options: ServeOptions,
     },
 }
 
-#[derive(Debug)]
-pub(crate) struct Mount {
-    pub(crate) uri_path: String,
-    pub(crate) fs_path: PathBuf,
+#[derive(Debug, StructOpt)]
+pub(crate) struct ServeOptions {
+    /// Address to bind to.
+    ///
+    /// Mostly useful to set to "0.0.0.0" to let other
+    /// devices in your network access the server.
+    #[structopt(long, default_value = "127.0.0.1")]
+    pub(crate) bind: IpAddr,
+
+    /// Mount a directory on an URI path: '--mount <uri>:<path>'.
+    ///
+    /// Example: '--mount assets:/home/peter/images'. Can be specified multiple
+    /// times. If you only want to mount one directory in the root, rather use
+    /// the `penguin serve` subcommand.
+    #[structopt(
+        short,
+        long = "--mount",
+        number_of_values = 1,
+        parse(try_from_str = parse_mount),
+    )]
+    pub(crate) mounts: Vec<Mount>,
 }
 
-impl FromStr for Mount {
-    type Err = &'static str;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let colon_pos = s.find(':').ok_or("does not contain a colon")?;
-        let fs_path = Path::new(&s[colon_pos + 1..]).to_owned();
+fn parse_mount(s: &str) -> Result<Mount, &'static str> {
+    let colon_pos = s.find(':').ok_or("does not contain a colon")?;
+    let fs_path = Path::new(&s[colon_pos + 1..]).to_owned();
 
-        let mut uri_path = s[..colon_pos].to_owned();
-        if !uri_path.starts_with('/') {
-            uri_path.insert(0, '/');
-        }
-        if uri_path.ends_with('/') && uri_path.len() > 1 {
-            uri_path.pop();
-        }
-
-        Ok(Self { uri_path, fs_path})
+    let mut uri_path = s[..colon_pos].to_owned();
+    if !uri_path.starts_with('/') {
+        uri_path.insert(0, '/');
     }
+    if uri_path.ends_with('/') && uri_path.len() > 1 {
+        uri_path.pop();
+    }
+
+    Ok(Mount { uri_path, fs_path})
 }
