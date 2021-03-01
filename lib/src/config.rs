@@ -195,9 +195,7 @@ impl From<(uri::Scheme, uri::Authority)> for ProxyTarget {
 
 impl fmt::Display for ProxyTarget {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.scheme.fmt(f)?;
-        self.authority.fmt(f)?;
-        Ok(())
+        write!(f, "{}://{}", self.scheme, self.authority)
     }
 }
 
