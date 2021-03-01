@@ -2,7 +2,7 @@ use std::{env, path::Path};
 
 use penguin::{Config, Mount, ProxyTarget, Server};
 
-use crate::args::{Args, ServeOptions};
+use crate::args::{Args, DEFAULT_PORT, ServeOptions};
 
 
 
@@ -37,7 +37,7 @@ pub(crate) async fn run(
         );
 
         if !args.is_quiet() {
-            pretty_print_config(&config);
+            pretty_print_config(&config, args);
         }
     }
 
@@ -46,7 +46,8 @@ pub(crate) async fn run(
     Ok(())
 }
 
-fn pretty_print_config(config: &Config) {
+fn pretty_print_config(config: &Config, args: &Args) {
+    // Routing description
     println!();
     bunt::println!("   {$cyan+bold}▸ Routing:{/$}");
     bunt::println!(
@@ -72,5 +73,17 @@ fn pretty_print_config(config: &Config) {
     } else {
         bunt::println!("     ╰╴ All remaining requests will be responded to with 404");
     }
+
+    // Random hints
+    println!();
+    bunt::println!("   {$cyan+bold}▸ Hints:{/$}");
+    bunt::println!(
+        "     • To reload all browser sessions run {$yellow}penguin reload{}{}{/$}",
+        if args.port != DEFAULT_PORT { format!(" -p {}", args.port) } else { "".into() },
+        args.control_path.as_ref()
+            .map(|p| format!(" --control-path {}", p))
+            .unwrap_or_default(),
+    );
+
     println!();
 }

@@ -3,6 +3,7 @@ use std::{net::IpAddr, path::{Path, PathBuf}};
 use structopt::StructOpt;
 use penguin::{Mount, ProxyTarget};
 
+pub(crate) const DEFAULT_PORT: u16 = 4090;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
