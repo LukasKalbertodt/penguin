@@ -36,6 +36,11 @@ async fn main() {
 }
 
 async fn run() -> Result<()> {
+    if env::args().count() == 1 {
+        print_welcome_message();
+        return Ok(());
+    }
+
     // Parse CLI arguments.
     let args = Args::from_args();
 
@@ -94,4 +99,18 @@ async fn reload(args: &Args) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn print_welcome_message() {
+    bunt::println!("{$blue+bold+intense}Penguin 🐧{/$}");
+    println!();
+    println!("You have to specify a subcommand. Example usages:");
+    bunt::println!("   ‣ Serve a directory: {$yellow}penguin serve ./target{/$}");
+    bunt::println!("   ‣ Reload all browser sessions: {$yellow}penguin reload{/$}");
+    bunt::println!("   ‣ Forward requests to proxy and serve one directory on a subpath:");
+    bunt::println!("         {$yellow}penguin proxy localhost:8000 -m /assets:frontend/dist{/$}");
+
+    println!();
+    bunt::println!("For more information, run {$yellow}penguin -h{/$} for a short CLI overview");
+    bunt::println!("or {$yellow}penguin --help{/$} for a detailed description.");
 }
