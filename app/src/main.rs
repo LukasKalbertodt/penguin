@@ -1,5 +1,6 @@
 use std::env;
 
+use log::LevelFilter;
 use penguin::{Mount, hyper::{Body, Client, Request}};
 use structopt::StructOpt;
 
@@ -15,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse CLI arguments.
     let args = Args::from_args();
 
-    init_logger();
+    init_logger(args.log_level);
 
     match &args.cmd {
         Command::Proxy { target, options } => {
@@ -32,9 +33,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn init_logger() {
+fn init_logger(level: LevelFilter) {
     if env::var("RUST_LOG") == Err(env::VarError::NotPresent) {
-        env::set_var("RUST_LOG", "penguin=warn");
+        env::set_var("RUST_LOG", format!("penguin={}", level));
     }
 
     pretty_env_logger::init();

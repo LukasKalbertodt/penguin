@@ -1,5 +1,7 @@
 use std::{net::IpAddr, path::{Path, PathBuf}};
 
+use log::LevelFilter;
+
 use structopt::StructOpt;
 use penguin::{Mount, ProxyTarget};
 
@@ -26,6 +28,13 @@ pub(crate) struct Args {
     /// Quiet: `-q` for less output, `-qq` for no output.
     #[structopt(short, global = true, parse(from_occurrences))]
     pub(crate) quiet: u8,
+
+    /// Sets the log level: trace, debug, info, warn, error or off.
+    ///
+    /// This value is only used if `RUST_LOG` is NOT set. If it is, the
+    /// environment variable controls everything.
+    #[structopt(short, long, global = true, default_value = "warn")]
+    pub(crate) log_level: LevelFilter,
 
     #[structopt(subcommand)]
     pub(crate) cmd: Command,

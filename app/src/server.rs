@@ -1,5 +1,6 @@
 use std::{env, path::Path};
 
+use log::LevelFilter;
 use penguin::{Config, Mount, ProxyTarget, Server};
 
 use crate::args::{Args, DEFAULT_PORT, ServeOptions};
@@ -78,12 +79,18 @@ fn pretty_print_config(config: &Config, args: &Args) {
     println!();
     bunt::println!("   {$cyan+bold}▸ Hints:{/$}");
     bunt::println!(
-        "     • To reload all browser sessions run {$yellow}penguin reload{}{}{/$}",
+        "     • To reload all browser sessions, run {$yellow}penguin reload{}{}{/$}",
         if args.port != DEFAULT_PORT { format!(" -p {}", args.port) } else { "".into() },
         args.control_path.as_ref()
             .map(|p| format!(" --control-path {}", p))
             .unwrap_or_default(),
     );
+    if args.log_level == LevelFilter::Warn {
+        bunt::println!(
+            "     • For more log output use {$yellow}-l trace{/$} \
+                or set the env variable {$yellow}RUST_LOG{/$}",
+        );
+    }
 
     println!();
 }
