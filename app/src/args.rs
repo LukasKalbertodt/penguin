@@ -12,7 +12,7 @@ use penguin::{Mount, ProxyTarget};
     setting(structopt::clap::AppSettings::VersionlessSubcommands),
 )]
 pub(crate) struct Args {
-    /// The port that the Penguin server listens on.
+    /// Port of the Penguin server.
     #[structopt(short, long, default_value = "4090", global = true)]
     pub(crate) port: u16,
 
@@ -48,6 +48,12 @@ pub(crate) enum Command {
         #[structopt(flatten)]
         options: ServeOptions,
     },
+
+    /// Reloads all browser sessions.
+    ///
+    /// This sends a reload request to a locally running penguin server. The
+    /// port and control path can be specified, if they are non-standard.
+    Reload,
 }
 
 #[derive(Debug, StructOpt)]

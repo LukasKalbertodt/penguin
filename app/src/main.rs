@@ -1,6 +1,6 @@
 use std::env;
 
-use penguin::Mount;
+use penguin::{Mount, hyper::{Body, Client, Request}};
 use structopt::StructOpt;
 
 use crate::args::{Args, Command};
@@ -26,6 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mounts = options.mounts.iter().chain(&root_mount);
             server::run(None, mounts, options, &args).await?;
         }
+        Command::Reload => reload(&args).await?,
     }
 
     Ok(())
@@ -37,4 +38,27 @@ fn init_logger() {
     }
 
     pretty_env_logger::init();
+}
+
+async fn reload(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: is '127.0.0.1' always valid? 'localhost' is not necessarily always
+    // defined, right?
+    let uri = format!(
+        "http://127.0.0.1:{}{}/reload",
+        args.port,
+        args.control_path.as_deref().unwrap_or(penguin::DEFAULT_CONTROL_PATH),
+    );
+
+    let req = Request::builder()
+        .method("POST")
+        .uri(&uri)
+        .body(Body::empty())
+        .expect("bug: failed to build request");
+
+    bunt::println!("Sending POST request to {[green]}", uri);
+    let client = Client::new();
+    client.request(req).await?;
+    bunt::println!("{$green+bold}✔ done{/$}");
+
+    Ok(())
 }
