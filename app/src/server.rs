@@ -1,5 +1,6 @@
 use std::{env, path::Path};
 
+use anyhow::{Context, Result};
 use log::LevelFilter;
 use penguin::{Config, Mount, ProxyTarget, Server};
 
@@ -12,12 +13,13 @@ pub(crate) async fn run(
     mounts: impl Iterator<Item = &Mount>,
     options: &ServeOptions,
     args: &Args,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     let bind_addr = (options.bind, args.port).into();
     let mut builder = Server::bind(bind_addr);
 
     for mount in mounts {
-        builder = builder.add_mount(&mount.uri_path, &mount.fs_path)?;
+        builder = builder.add_mount(&mount.uri_path, &mount.fs_path)
+            .context("failed to add mount")?;
     }
     if let Some(control_path) = &args.control_path {
         builder = builder.set_control_path(control_path);
@@ -27,7 +29,7 @@ pub(crate) async fn run(
     }
 
 
-    let config = builder.validate()?;
+    let config = builder.validate().context("invalid penguin config")?;
     let (server, _controller) = Server::build(config.clone());
 
     // Nice output of what is being done

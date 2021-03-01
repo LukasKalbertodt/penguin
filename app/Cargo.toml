@@ -10,6 +10,7 @@ path = "src/main.rs"
 
 
 [dependencies]
+anyhow = "1"
 bunt = "0.2.4"
 log = "0.4"
 penguin = { path = "../lib" }
