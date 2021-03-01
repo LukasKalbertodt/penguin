@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Nice output of what is being done
     bunt::println!(
-        "{$bold}Penguin started!{/$} 🐧 is listening on {$yellow+intense+bold}http://{}{/$}",
+        "{$bold}Penguin started!{/$} Listening on {$yellow+intense+bold}http://{}{/$}",
         bind_addr,
     );
     pretty_print_config(&config);
