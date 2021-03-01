@@ -9,10 +9,12 @@ mod inject;
 mod serve;
 mod ws;
 
-/// Reexport of `http` dependency.
-pub use hyper::http;
+/// Reexport of `hyper` dependency (which includes `http`).
+pub extern crate hyper;
 
-pub use config::{Builder, Config, ConfigError, Mount, ProxyTarget, ProxyTargetParseError};
+pub use config::{
+    Builder, Config, ConfigError, DEFAULT_CONTROL_PATH, Mount, ProxyTarget, ProxyTargetParseError
+};
 
 /// Penguin server: the main type of this library.
 ///

@@ -16,7 +16,7 @@ use crate::{Controller, Server};
 ///
 /// For URI paths, the characters a-z, A-Z, 0-9 and `- . _ ~` are "safe": they
 /// don't need to be escaped and don't have a special meaning.
-const DEFAULT_CONTROL_PATH: &str = "/~~penguin";
+pub const DEFAULT_CONTROL_PATH: &str = "/~~penguin";
 
 /// A valid penguin server configuration.
 ///
