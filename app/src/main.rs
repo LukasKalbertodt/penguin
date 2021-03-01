@@ -55,10 +55,16 @@ async fn reload(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         .body(Body::empty())
         .expect("bug: failed to build request");
 
-    bunt::println!("Sending POST request to {[green]}", uri);
+    if !args.is_quiet() {
+        bunt::println!("Sending POST request to {[green]}", uri);
+    }
+
     let client = Client::new();
     client.request(req).await?;
-    bunt::println!("{$green+bold}✔ done{/$}");
+
+    if !args.is_quiet() {
+        bunt::println!("{$green+bold}✔ done{/$}");
+    }
 
     Ok(())
 }

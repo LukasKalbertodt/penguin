@@ -22,6 +22,10 @@ pub(crate) struct Args {
     #[structopt(long, global = true)]
     pub(crate) control_path: Option<String>,
 
+    /// Quiet: `-q` for less output, `-qq` for no output.
+    #[structopt(short, global = true, parse(from_occurrences))]
+    pub(crate) quiet: u8,
+
     #[structopt(subcommand)]
     pub(crate) cmd: Command,
 }
@@ -92,4 +96,14 @@ fn parse_mount(s: &str) -> Result<Mount, &'static str> {
     }
 
     Ok(Mount { uri_path, fs_path})
+}
+
+impl Args {
+    pub(crate) fn is_quiet(&self) -> bool {
+        self.quiet > 0
+    }
+
+    pub(crate) fn is_muted(&self) -> bool {
+        self.quiet == 2
+    }
 }

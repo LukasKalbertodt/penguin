@@ -30,11 +30,16 @@ pub(crate) async fn run(
     let (server, _controller) = Server::build(config.clone());
 
     // Nice output of what is being done
-    bunt::println!(
-        "{$bold}Penguin started!{/$} Listening on {$yellow+intense+bold}http://{}{/$}",
-        bind_addr,
-    );
-    pretty_print_config(&config);
+    if !args.is_muted() {
+        bunt::println!(
+            "{$bold}Penguin started!{/$} Listening on {$yellow+intense+bold}http://{}{/$}",
+            bind_addr,
+        );
+
+        if !args.is_quiet() {
+            pretty_print_config(&config);
+        }
+    }
 
     server.await?;
 
