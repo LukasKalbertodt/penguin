@@ -42,7 +42,7 @@
 
 #![deny(missing_debug_implementations)]
 
-use std::{fmt, future::Future, io, net::SocketAddr, pin::Pin, task};
+use std::{fmt, future::Future, net::SocketAddr, pin::Pin, task};
 
 use tokio::sync::broadcast::{self, Sender};
 
@@ -65,7 +65,7 @@ pub use config::{
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Server {
     // TODO: maybe avoid boxing this if possible?
-    future: Pin<Box<dyn Send + Future<Output = Result<(), Error>>>>,
+    future: Pin<Box<dyn Send + Future<Output = Result<(), hyper::Error>>>>,
 }
 
 impl Server {
@@ -87,7 +87,7 @@ impl Server {
 }
 
 impl Future for Server {
-    type Output = Result<(), Error>;
+    type Output = Result<(), hyper::Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         self.future.as_mut().poll(cx)
@@ -119,21 +119,6 @@ impl Controller {
     pub fn show_message(&self, msg: impl Into<String>) {
         let _ = self.0.send(Action::Message(msg.into()));
     }
-}
-
-/// Error returned by awaiting `Server`: everything that can go wrong when
-/// running the server.
-#[non_exhaustive]
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("hyper HTTP server error: {0}")]
-    Hyper(#[from] hyper::Error),
-
-    #[error("IO error: {0}")]
-    Io(#[from] io::Error),
-
-    #[error("Websocket error: {0}")]
-    Tungestine(#[from] hyper_tungstenite::tungstenite::Error),
 }
 
 #[derive(Debug, Clone)]

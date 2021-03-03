@@ -1,16 +1,20 @@
 use std::{convert::Infallible, future::Future, panic::AssertUnwindSafe, sync::Arc};
 
 use futures::FutureExt;
-use hyper::{Body, Method, Request, Response, Server, StatusCode, http::uri::PathAndQuery, service::{make_service_fn, service_fn}};
+use hyper::{
+    Body, Method, Request, Response, Server, StatusCode,
+    http::uri::PathAndQuery,
+    service::{make_service_fn, service_fn},
+};
 use tokio::sync::broadcast::Sender;
 
-use super::{Action, Config, Error};
+use super::{Action, Config};
 
 mod fs;
 mod proxy;
 
 
-pub(crate) async fn run(config: Config, actions: Sender<Action>) -> Result<(), Error> {
+pub(crate) async fn run(config: Config, actions: Sender<Action>) -> Result<(), hyper::Error> {
     let addr = config.bind_addr;
 
     let config = Arc::new(config);
