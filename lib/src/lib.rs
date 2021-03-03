@@ -1,3 +1,45 @@
+//! Penguin is a dev server with features like auto-reloading, a static file
+//! server, and proxy-support. It is available both, as an app and as a library.
+//! You are currently reading the library docs. If you are interested in the CLI
+//! app, see [the README](https://github.com/LukasKalbertodt/penguin#readme).
+//!
+//! This library essentially allows you to configure and then start an HTTP
+//! server. After starting the server you get a [`Controller`] which allows you
+//! to send commands to active browser sessions, like reloading the page or
+//! showing a message.
+//!
+//!
+//! # Quick start
+//!
+//! This should get you started as it shows almost everything this library has
+//! to offer:
+//!
+//! ```no_run
+//! use std::{path::Path, time::Duration};
+//! use penguin::Server;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Configure the server.
+//!     let (server, controller) = Server::bind(([127, 0, 0, 1], 4090).into())
+//!         .proxy("localhost:8000".parse()?)
+//!         .add_mount("/assets", Path::new("./frontend/build"))?
+//!         .build()?;
+//!
+//!     // In some other task, you can control the browser sessions. This dummy
+//!     // code just waits 5 seconds and then reloads all sessions.
+//!     tokio::spawn(async move {
+//!         tokio::time::sleep(Duration::from_secs(5));
+//!         controller.reload();
+//!     });
+//!
+//!     server.await?;
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+
 #![deny(missing_debug_implementations)]
 
 use std::{fmt, future::Future, io, net::SocketAddr, pin::Pin, task};
