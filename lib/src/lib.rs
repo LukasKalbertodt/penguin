@@ -29,7 +29,7 @@
 //!     // In some other task, you can control the browser sessions. This dummy
 //!     // code just waits 5 seconds and then reloads all sessions.
 //!     tokio::spawn(async move {
-//!         tokio::time::sleep(Duration::from_secs(5));
+//!         tokio::time::sleep(Duration::from_secs(5)).await;
 //!         controller.reload();
 //!     });
 //!
