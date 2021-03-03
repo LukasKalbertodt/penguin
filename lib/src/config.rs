@@ -181,7 +181,7 @@ pub enum ConfigError {
 /// The `FromStr` allows omitting the scheme ('http' or 'https') when the host
 /// is `"localhost"`, `"127.0.0.1"` or `"::1"` and defaults to 'http' in that
 /// case. For all other hosts, the scheme has to be specified.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProxyTarget {
     pub(crate) scheme: uri::Scheme,
     pub(crate) authority: uri::Authority,
