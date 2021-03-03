@@ -51,6 +51,9 @@ mod inject;
 mod serve;
 mod ws;
 
+#[cfg(test)]
+mod tests;
+
 /// Reexport of `hyper` dependency (which includes `http`).
 pub extern crate hyper;
 
