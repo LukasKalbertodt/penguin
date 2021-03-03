@@ -99,7 +99,6 @@ impl Builder {
     ///
     /// This method returns `ConfigError::DuplicateUriPath` if the same
     /// `uri_path` was added before.
-    ///
     pub fn add_mount(
         mut self,
         uri_path: impl Into<String>,
@@ -121,6 +120,9 @@ impl Builder {
     }
 
     /// Overrides the control path (`/~~penguin` by default) with a custom path.
+    ///
+    /// This is only useful if your web application wants to use the route
+    /// `/~~penguin`.
     pub fn set_control_path(mut self, path: impl Into<String>) -> Self {
         self.0.control_path = path.into();
         normalize_path(&mut self.0.control_path);

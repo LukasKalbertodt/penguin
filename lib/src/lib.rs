@@ -39,6 +39,25 @@
 //! }
 //! ```
 //!
+//! # Routing
+//!
+//! Incoming requests are routed like this (from highest to lowest priority):
+//!
+//! - Requests to the control path (`/~~penguin` by default) are internally
+//!   handled. This is used for establishing WS connections and to receive
+//!   commands.
+//! - Requests with a path matching one of the mounts is served from that
+//!   directory.
+//!     - The most specific mount (i.e. the one with the longest URI path) is
+//!       used. Consider there are two mounts: `/cat` -> `./foo` and `/cat/paw`
+//!       -> `./bar`. Then a request to `/cat/paw/info.json` is replied to with
+//!       `./bar/info.json` while a request to `/cat/style.css` is replied to
+//!       with `./foo/style.css`
+//! - If a proxy is configured, then all remaining requests are forwarded to it
+//!   and its reply is forwarded back to the initiator of the request. Otherwise
+//!   (no proxy configured), all remaining requests are answered with 404.
+//!
+//!
 
 #![deny(missing_debug_implementations)]
 
