@@ -4,6 +4,20 @@ version = "0.1.0"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2018"
 
+description = """
+Dev server with auto-reload, static file server, proxy support, and more.
+Language and framework agnostic. This is the library crate, but Penguin exists
+as a CLI app, too.
+"""
+documentation = "https://docs.rs/penguin/"
+repository = "https://github.com/LukasKalbertodt/penguin/"
+readme = "../README.md"
+license = "MIT/Apache-2.0"
+
+keywords = ["development", "autoreload", "devserver"]
+categories = ["development-tools", "web-programming::http-server"]
+exclude = ["Cargo.lock"]
+
 
 [dependencies]
 futures = "0.3"
