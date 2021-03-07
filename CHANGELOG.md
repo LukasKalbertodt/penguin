@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+
+## [0.1.1] - 2021-03-07
 ### Added
 - `util::wait_for_proxy`
 
@@ -17,4 +19,5 @@ All notable changes to this project will be documented in this file.
 - Everything
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LukasKalbertodt/penguin/compare/v0.1.0...v0.1.1
