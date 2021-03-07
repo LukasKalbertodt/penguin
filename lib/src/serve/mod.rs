@@ -32,7 +32,7 @@ pub(crate) async fn run(config: Config, actions: Sender<Action>) -> Result<(), h
     });
 
     log::info!("Creating hyper server");
-    let server = Server::bind(&addr).serve(make_service);
+    let server = Server::try_bind(&addr)?.serve(make_service);
 
     log::info!("Start listening with hyper server");
     server.await?;
