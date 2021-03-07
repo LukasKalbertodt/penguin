@@ -68,6 +68,7 @@ use tokio::sync::broadcast::{self, Sender};
 mod config;
 mod inject;
 mod serve;
+pub mod util;
 mod ws;
 
 #[cfg(test)]
