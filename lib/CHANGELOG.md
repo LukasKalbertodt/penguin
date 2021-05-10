@@ -7,6 +7,7 @@ All notable changes to the penguin **library** will be documented here.
 
 ### Fixed
 - Make Penguin work with non-`127.0.0.1` loopback addresses.
+- Fix warning about directory traversal attack incorrectly being emitted.
 
 ## [0.1.1] - 2021-03-07
 ### Added

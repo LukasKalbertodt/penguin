@@ -14,21 +14,21 @@ pub(crate) async fn try_serve(
     req: &Request<Body>,
     config: &Config,
 ) -> Option<Response<Body>> {
-    let (subpath, sd) = config.mounts.iter()
-        .filter_map(|sd| {
+    let (subpath, mount) = config.mounts.iter()
+        .filter_map(|mount| {
             req.uri()
                 .path()
-                .strip_prefix(&sd.uri_path)
+                .strip_prefix(&mount.uri_path)
                 .map(|subpath| {
                     // Make sure that subpath never starts with `/`.
-                    (subpath.trim_start_matches('/').to_owned(), sd)
+                    (subpath.trim_start_matches('/').to_owned(), mount)
                 })
         })
 
         // We want the "most specific" mount, so the longest URI path wins.
-        .max_by_key(|(_, sd)| sd.uri_path.len())?;
+        .max_by_key(|(_, mount)| mount.uri_path.len())?;
 
-    Some(serve(req, &subpath, &sd.fs_path, config).await)
+    Some(serve(req, &subpath, &mount.fs_path, config).await)
 }
 
 async fn serve(
@@ -42,11 +42,34 @@ async fn serve(
     let subpath = Path::new(subpath);
     let path = fs_root.join(subpath);
 
-    if let Err(response) = check_directory_traversal_attack(&path, fs_root).await {
-        log::warn!("Directory traversal attack detected -> responding BAD REQUEST");
-        return response;
+    // Protect against directory traversal attacks.
+    macro_rules! canonicalize {
+        ($path:expr) => {
+            match fs::canonicalize($path).await {
+                Ok(v) => v,
+                Err(e) if e.kind() == ErrorKind::NotFound => return not_found(),
+                Err(e) => panic!(
+                    "unhandled error: could not canonicalize path '{}': {}",
+                    $path.display(),
+                    e,
+                ),
+            }
+        };
     }
 
+    let canonical_req = canonicalize!(&path);
+    let canonical_root = canonicalize!(fs_root);
+    if !canonical_req.starts_with(canonical_root) {
+        log::warn!(
+            "Directory traversal attack detected ({:?} {}) -> responding BAD REQUEST",
+            req.method(),
+            req.uri().path(),
+        );
+
+        return bad_request("Bad request: requested file outside of served directory\n");
+    }
+
+    // Dispatch depending on whether it's a file or directory.
     if !path.exists() {
         not_found()
     } else if path.is_file() {
@@ -155,24 +178,4 @@ async fn serve_file(path: &Path, config: &Config) -> Response<Body> {
 
         response.body(body).expect("bug: invalid response")
     }
-}
-
-/// Protects against directory traversal attacks
-async fn check_directory_traversal_attack(path: &Path, fs_root: &Path) -> Result<(), Response<Body>> {
-    fn map_error(e: io::Error) -> Response<Body> {
-        if e.kind() == ErrorKind::NotFound {
-            not_found()
-        } else {
-            panic!("could not canonicalize path");
-        }
-    }
-
-    let canonical_req = fs::canonicalize(path).await.map_err(map_error)?;
-    let canonical_root = fs::canonicalize(fs_root).await.map_err(map_error)?;
-
-    if !canonical_req.starts_with(canonical_root) {
-        return Err(bad_request("Bad request: requested file outside of served directory\n"));
-    }
-
-    Ok(())
 }
