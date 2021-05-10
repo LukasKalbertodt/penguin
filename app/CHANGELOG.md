@@ -4,6 +4,8 @@ All notable changes to the penguin **CLI app** will be documented here.
 
 
 ## [Unreleased]
+### Added
+- Add `--open` flag to open the browser automatically
 
 
 ## 0.1.0 - 2021-03-03

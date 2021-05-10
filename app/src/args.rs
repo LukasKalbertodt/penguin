@@ -36,6 +36,10 @@ pub(crate) struct Args {
     #[structopt(short, long, global = true, default_value = "warn")]
     pub(crate) log_level: LevelFilter,
 
+    /// Automatically opens the browser with the URL of this server.
+    #[structopt(long, global = true)]
+    pub(crate) open: bool,
+
     #[structopt(subcommand)]
     pub(crate) cmd: Command,
 }

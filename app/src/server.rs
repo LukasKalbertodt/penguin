@@ -1,4 +1,4 @@
-use std::{env, path::Path};
+use std::{env, path::Path, thread, time::Duration};
 
 use anyhow::{Context, Result};
 use log::LevelFilter;
@@ -42,6 +42,29 @@ pub(crate) async fn run(
         if !args.is_quiet() {
             pretty_print_config(&config, args);
         }
+    }
+
+    if args.open {
+        // This is a bit hacky but it works and doing it properly is
+        // surprisingly hard. We want to only open the browser if we were able
+        // to start the server without problems (where 99% of anticipated
+        // problems are: port is already in use). `hyper` doesn't quite allow us
+        // to do that as far as I know. So we simply start a thread and wait a
+        // bit. If starting the server errors, then the program (including this
+        // thread) will be stopped quickly and the `open::that` call is never
+        // executed.
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(50));
+
+            let url = format!("http://{}", bind_addr);
+            match open::that(url) {
+                Ok(c) if c.success() => {}
+                other => bunt::println!(
+                    "{$yellow}Warning{/$}: couldn't open browser. Error: {:?}",
+                    other,
+                ),
+            }
+        });
     }
 
     server.await?;
