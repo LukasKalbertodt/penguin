@@ -5,6 +5,10 @@ All notable changes to the penguin **library** will be documented here.
 
 ## [Unreleased]
 
+### Added
+- All responses (except the ones forwarded from the proxy server) now contain
+  the "server" HTTP header.
+
 ### Fixed
 - Make Penguin work with non-`127.0.0.1` loopback addresses.
 - Fix warning about directory traversal attack incorrectly being emitted.

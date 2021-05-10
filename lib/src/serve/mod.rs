@@ -47,6 +47,7 @@ async fn handle_internal_errors(
         let body = format!("Internal server error: this is a bug in Penguin!\n\n{}\n", msg);
         Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .header("Server", SERVER_HEADER)
             .body(body.into())
             .unwrap()
     }
@@ -162,6 +163,7 @@ fn bad_request(msg: &'static str) -> Response<Body> {
 
     Response::builder()
         .status(StatusCode::BAD_REQUEST)
+        .header("Server", SERVER_HEADER)
         .body(msg.into())
         .expect("bug: invalid response")
 }
@@ -171,6 +173,9 @@ fn not_found() -> Response<Body> {
 
     Response::builder()
         .status(StatusCode::NOT_FOUND)
+        .header("Server", SERVER_HEADER)
         .body(Body::from("Not found\n"))
         .expect("bug: invalid response")
 }
+
+const SERVER_HEADER: &str = concat!("Penguin v", env!("CARGO_PKG_VERSION"));

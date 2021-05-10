@@ -5,7 +5,7 @@ use tokio::fs;
 use tokio_util::codec::{FramedRead, BytesCodec};
 
 use crate::{inject, Config};
-use super::{bad_request, not_found};
+use super::{bad_request, not_found, SERVER_HEADER};
 
 
 /// Checks if the request matches any `config.mounts` and returns an
@@ -147,6 +147,7 @@ async fn serve_dir(
     Ok(
         Response::builder()
             .header("Content-Type", "text/html; charset=utf-8")
+            .header("Server", SERVER_HEADER)
             .body(html.into())
             .expect("bug: invalid response")
     )
@@ -165,13 +166,15 @@ async fn serve_file(path: &Path, config: &Config) -> Response<Body> {
         Response::builder()
             .header("Content-Type", "text/html")
             .header("Content-Length", html.len().to_string())
+            .header("Server", SERVER_HEADER)
             .body(html.into())
             .expect("bug: invalid response")
     } else {
         let file = fs::File::open(path).await.expect("failed to open file");
         let body = Body::wrap_stream(FramedRead::new(file, BytesCodec::new()));
 
-        let mut response = Response::builder();
+        let mut response = Response::builder()
+            .header("Server", SERVER_HEADER);
         if let Some(mime) = mime {
             response = response.header("Content-Type", mime.to_string());
         }

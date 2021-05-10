@@ -5,6 +5,8 @@ use hyper_tls::HttpsConnector;
 
 use crate::{inject, Config, ProxyTarget};
 
+use super::SERVER_HEADER;
+
 
 /// HTML content to reply in case an error occurs when connecting to the proxy.
 const PROXY_ERROR_HTML: &str = include_str!("../assets/proxy-error.html");
@@ -83,6 +85,7 @@ fn gateway_error(msg: &str, e: hyper::Error, config: &Config) -> Response<Body> 
 
     Response::builder()
         .status(status)
+        .header("Server", SERVER_HEADER)
         .header("Content-Type", "text/html")
         .body(html.into())
         .unwrap()
