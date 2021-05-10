@@ -9,6 +9,7 @@ All notable changes to the penguin **CLI app** will be documented here.
 - Mounted file system paths are now automatically watched for file changes. The
   browser sessions will reload automatically if anything changes.
 - Add `--no-auto-watch` flag to disable auto watch behavior.
+- Add `-w/--watch` option to specify additional watched paths.
 
 
 ## 0.1.0 - 2021-03-03

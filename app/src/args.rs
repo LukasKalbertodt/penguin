@@ -107,6 +107,12 @@ pub(crate) struct ServeOptions {
     /// When specified, penguin will not automatically watch the mounted paths.
     #[structopt(long)]
     pub(crate) no_auto_watch: bool,
+
+    /// Watch a path for file system changes, triggering a reload.
+    ///
+    /// Note that mounted paths are already watched by default.
+    #[structopt(short, long = "--watch", number_of_values = 1)]
+    pub(crate) watched_paths: Vec<PathBuf>,
 }
 
 fn parse_mount(s: &str) -> Result<Mount, &'static str> {

@@ -1,4 +1,4 @@
-use std::{env, path::Path, thread, time::Duration};
+use std::{env, path::{Path, PathBuf}, thread, time::Duration};
 
 use anyhow::{Context, Result};
 use log::{debug, info, trace, LevelFilter};
@@ -33,7 +33,10 @@ pub(crate) async fn run(
     let (server, controller) = Server::build(config.clone());
 
     if !options.no_auto_watch {
-        watch(controller, mounts)?;
+        let paths = mounts.into_iter().map(|m| &m.fs_path).chain(&options.watched_paths);
+        watch(controller, paths)?;
+    } else if !options.watched_paths.is_empty() {
+        watch(controller, &options.watched_paths)?;
     }
 
     // Nice output of what is being done
@@ -76,7 +79,7 @@ pub(crate) async fn run(
     Ok(())
 }
 
-fn watch<'a>(controller: Controller, mounts: impl IntoIterator<Item = &'a Mount>) -> Result<()> {
+fn watch<'a>(controller: Controller, paths: impl IntoIterator<Item = &'a PathBuf>) -> Result<()> {
     use std::sync::mpsc::{channel, RecvTimeoutError};
     use notify::{RawEvent, RecursiveMode, Watcher};
 
@@ -95,9 +98,9 @@ fn watch<'a>(controller: Controller, mounts: impl IntoIterator<Item = &'a Mount>
     let (tx, rx) = channel();
     let mut watcher = notify::raw_watcher(tx).context("could not create FS watcher")?;
 
-    for mount in mounts {
-        watcher.watch(&mount.fs_path, RecursiveMode::Recursive)
-            .context(format!("failed to watch '{}'", mount.fs_path.display()))?;
+    for path in paths {
+        watcher.watch(path, RecursiveMode::Recursive)
+            .context(format!("failed to watch '{}'", path.display()))?;
     }
 
     // We create a new thread that will react to incoming events and trigger a
