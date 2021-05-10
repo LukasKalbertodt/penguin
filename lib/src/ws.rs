@@ -31,9 +31,9 @@ pub(crate) async fn handle_connection(
                         // mean this WS task was never awoken while many actions
                         // were incoming.
                         log::warn!(
-                            "Missed {} actions. This should not happen. \
-                                If you see this, please open an issue here: \
-                                https://github.com/LukasKalbertodt/penguin/issues",
+                            "Missed {} actions. Did you submit too many actions too quickly? \
+                                For example, this can happen by watching a directory where lots \
+                                of files change at the same time.",
                             skipped,
                         );
                         continue;
