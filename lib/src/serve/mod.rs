@@ -115,10 +115,6 @@ async fn handle_control(
                 response
             }
             Err(_) => {
-                // TODO: `upgrade` does not guarantee this (yet), but from
-                // looking at the code, I think an error here means that the
-                // request is invalid.
-
                 log::warn!("Invalid WS upgrade request");
                 bad_request("Failed to upgrade to WS connection\n")
             }
