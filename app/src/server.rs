@@ -1,8 +1,8 @@
 use std::{env, path::Path, thread, time::Duration};
 
 use anyhow::{Context, Result};
-use log::LevelFilter;
-use penguin::{Config, Mount, ProxyTarget, Server};
+use log::{debug, info, trace, LevelFilter};
+use penguin::{Config, Controller, Mount, ProxyTarget, Server};
 
 use crate::args::{Args, DEFAULT_PORT, ServeOptions};
 
@@ -10,14 +10,14 @@ use crate::args::{Args, DEFAULT_PORT, ServeOptions};
 
 pub(crate) async fn run(
     proxy: Option<&ProxyTarget>,
-    mounts: impl Iterator<Item = &Mount>,
+    mounts: impl Clone + IntoIterator<Item = &Mount>,
     options: &ServeOptions,
     args: &Args,
 ) -> Result<()> {
     let bind_addr = (options.bind, args.port).into();
     let mut builder = Server::bind(bind_addr);
 
-    for mount in mounts {
+    for mount in mounts.clone() {
         builder = builder.add_mount(&mount.uri_path, &mount.fs_path)
             .context("failed to add mount")?;
     }
@@ -30,7 +30,11 @@ pub(crate) async fn run(
 
 
     let config = builder.validate().context("invalid penguin config")?;
-    let (server, _controller) = Server::build(config.clone());
+    let (server, controller) = Server::build(config.clone());
+
+    if !options.no_auto_watch {
+        watch(controller, mounts)?;
+    }
 
     // Nice output of what is being done
     if !args.is_muted() {
@@ -68,6 +72,62 @@ pub(crate) async fn run(
     }
 
     server.await?;
+
+    Ok(())
+}
+
+fn watch<'a>(controller: Controller, mounts: impl IntoIterator<Item = &'a Mount>) -> Result<()> {
+    use std::sync::mpsc::{channel, RecvTimeoutError};
+    use notify::{RawEvent, RecursiveMode, Watcher};
+
+    /// Helper to format an optional path in a nice way.
+    fn pretty_path(event: &RawEvent) -> String {
+        match &event.path {
+            Some(p) => p.display().to_string(),
+            None =>  "???".into(),
+        }
+    }
+
+    // We could make this configurable via CLI, but I'm not sure if it's worth it.
+    const DEBOUNCE_DURATION: Duration = Duration::from_millis(200);
+
+    // Create an configure watcher.
+    let (tx, rx) = channel();
+    let mut watcher = notify::raw_watcher(tx).context("could not create FS watcher")?;
+
+    for mount in mounts {
+        watcher.watch(&mount.fs_path, RecursiveMode::Recursive)
+            .context(format!("failed to watch '{}'", mount.fs_path.display()))?;
+    }
+
+    // We create a new thread that will react to incoming events and trigger a
+    // page reload.
+    thread::spawn(move || {
+        // Move it to the thread to avoid dropping it early.
+        let _watcher = watcher;
+
+        while let Ok(event) = rx.recv() {
+            debug!(
+                "Received watch-event for '{}'. Debouncing now for {:?}.",
+                pretty_path(&event),
+                DEBOUNCE_DURATION,
+            );
+
+            // Debounce. We loop forever until no new event arrived for
+            // `DEBOUNCE_DURATION`.
+            loop {
+                match rx.recv_timeout(DEBOUNCE_DURATION) {
+                    Ok(event) => trace!("Debounce interrupted by '{}'", pretty_path(&event)),
+                    Err(RecvTimeoutError::Timeout) => break,
+                    Err(RecvTimeoutError::Disconnected) => return,
+                }
+            }
+
+            // Finally, send a reload command
+            info!("Reloading browser sessions due to file changes in watched directories");
+            controller.reload();
+        }
+    });
 
     Ok(())
 }

@@ -51,6 +51,10 @@ pub(crate) enum Command {
     /// You can mount more directories via '--mount'. If you don't specify a
     /// main directory for this subcommand, you have to mount at least one
     /// directory via '--mount'.
+    ///
+    /// Like with `--mount`, the directory specified here will be watched for
+    /// file changes to automatically reload browser sessions. You can disable
+    /// that with `--no-auto-watch`.
     Serve {
         #[structopt(parse(from_os_str))]
         path: Option<PathBuf>,
@@ -88,6 +92,10 @@ pub(crate) struct ServeOptions {
     /// Example: '--mount assets:/home/peter/images'. Can be specified multiple
     /// times. If you only want to mount one directory in the root, rather use
     /// the `penguin serve` subcommand.
+    ///
+    /// By default, directories specified here will be watched for file changes
+    /// to automatically reload browser sessions. You can disable that with
+    /// `--no-auto-watch`.
     #[structopt(
         short,
         long = "--mount",
@@ -95,6 +103,10 @@ pub(crate) struct ServeOptions {
         parse(try_from_str = parse_mount),
     )]
     pub(crate) mounts: Vec<Mount>,
+
+    /// When specified, penguin will not automatically watch the mounted paths.
+    #[structopt(long)]
+    pub(crate) no_auto_watch: bool,
 }
 
 fn parse_mount(s: &str) -> Result<Mount, &'static str> {

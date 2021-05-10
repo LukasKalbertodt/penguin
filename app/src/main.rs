@@ -48,7 +48,7 @@ async fn run() -> Result<()> {
 
     match &args.cmd {
         Command::Proxy { target, options } => {
-            server::run(Some(target), options.mounts.iter(), options, &args)
+            server::run(Some(target), &options.mounts, options, &args)
                 .await
                 .context("failed to run server")?;
         }
