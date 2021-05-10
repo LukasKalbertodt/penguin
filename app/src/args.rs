@@ -19,6 +19,13 @@ pub(crate) struct Args {
     #[structopt(short, long, default_value = "4090", global = true)]
     pub(crate) port: u16,
 
+    /// Address to bind to.
+    ///
+    /// Mostly useful to set to "0.0.0.0" to let other devices in your network
+    /// access the server.
+    #[structopt(long, default_value = "127.0.0.1", global = true)]
+    pub(crate) bind: IpAddr,
+
     /// Overrides the default control path '/~~penguin' with a custom path.
     ///
     /// Only useful you need to use '/~~penguin' in your own application.
@@ -80,13 +87,6 @@ pub(crate) enum Command {
 
 #[derive(Debug, StructOpt)]
 pub(crate) struct ServeOptions {
-    /// Address to bind to.
-    ///
-    /// Mostly useful to set to "0.0.0.0" to let other
-    /// devices in your network access the server.
-    #[structopt(long, default_value = "127.0.0.1")]
-    pub(crate) bind: IpAddr,
-
     /// Mount a directory on an URI path: '--mount <uri>:<path>'.
     ///
     /// Example: '--mount assets:/home/peter/images'. Can be specified multiple

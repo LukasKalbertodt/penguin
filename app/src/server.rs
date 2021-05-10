@@ -14,7 +14,7 @@ pub(crate) async fn run(
     options: &ServeOptions,
     args: &Args,
 ) -> Result<()> {
-    let bind_addr = (options.bind, args.port).into();
+    let bind_addr = (args.bind, args.port).into();
     let mut builder = Server::bind(bind_addr);
 
     for mount in mounts.clone() {

@@ -37,6 +37,14 @@ fn parse_proxy_target() {
         ProxyTarget::from((Scheme::HTTPS, Authority::from_static("127.0.0.1:30"))),
     );
     assert_eq!(
+        ProxyTarget::from_str("127.0.0.1:30").unwrap(),
+        ProxyTarget::from((Scheme::HTTP, Authority::from_static("127.0.0.1:30"))),
+    );
+    assert_eq!(
+        ProxyTarget::from_str("127.1.2.3:40").unwrap(),
+        ProxyTarget::from((Scheme::HTTP, Authority::from_static("127.1.2.3:40"))),
+    );
+    assert_eq!(
         ProxyTarget::from_str("http://github.com").unwrap(),
         ProxyTarget::from((Scheme::HTTP, Authority::from_static("github.com"))),
     );

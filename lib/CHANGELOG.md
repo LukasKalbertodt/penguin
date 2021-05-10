@@ -5,6 +5,9 @@ All notable changes to the penguin **library** will be documented here.
 
 ## [Unreleased]
 
+### Fixed
+- Make Penguin work with non-`127.0.0.1` loopback addresses.
+
 ## [0.1.1] - 2021-03-07
 ### Added
 - `util::wait_for_proxy`

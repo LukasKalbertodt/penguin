@@ -72,10 +72,9 @@ fn init_logger(level: LevelFilter) {
 }
 
 async fn reload(args: &Args) -> Result<()> {
-    // TODO: is '127.0.0.1' always valid? 'localhost' is not necessarily always
-    // defined, right?
     let uri = format!(
-        "http://127.0.0.1:{}{}/reload",
+        "http://{}:{}{}/reload",
+        args.bind,
         args.port,
         args.control_path.as_deref().unwrap_or(penguin::DEFAULT_CONTROL_PATH),
     );

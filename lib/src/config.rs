@@ -1,4 +1,4 @@
-use std::{fmt, net::SocketAddr, path::PathBuf, str::FromStr};
+use std::{fmt, net::{IpAddr, SocketAddr}, path::PathBuf, str::FromStr};
 
 use hyper::{Uri, http::uri};
 
@@ -177,9 +177,9 @@ pub enum ConfigError {
 /// - use the `FromStr` impl: `"http://localhost:8000".parse()`, or
 /// - use the `From<(Scheme, Authority)>` impl.
 ///
-/// The `FromStr` allows omitting the scheme ('http' or 'https') when the host
-/// is `"localhost"`, `"127.0.0.1"` or `"::1"` and defaults to 'http' in that
-/// case. For all other hosts, the scheme has to be specified.
+/// The `FromStr` allows omitting the scheme ('http' or 'https') if the host is
+/// `"localhost"` or a loopback address and defaults to 'http' in that case. For
+/// all other hosts, the scheme has to be specified.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProxyTarget {
     pub(crate) scheme: uri::Scheme,
@@ -211,7 +211,9 @@ impl FromStr for ProxyTarget {
         let authority = parts.authority.ok_or(ProxyTargetParseError::MissingAuthority)?;
         let scheme = parts.scheme
             .or_else(|| {
-                if ["localhost", "127.0.0.1", "::1"].contains(&authority.host()) {
+                // If the authority is a loopback IP or "localhost", we default to HTTP as scheme.
+                let ip = authority.host().parse::<IpAddr>();
+                if authority.host() == "localhost" || ip.map_or(false, |ip| ip.is_loopback()) {
                     Some(uri::Scheme::HTTP)
                 } else {
                     None
