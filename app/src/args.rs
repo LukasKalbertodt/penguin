@@ -1,4 +1,4 @@
-use std::{net::IpAddr, path::{Path, PathBuf}};
+use std::{net::IpAddr, path::{Path, PathBuf}, time::Duration};
 
 use log::LevelFilter;
 
@@ -113,6 +113,19 @@ pub(crate) struct ServeOptions {
     /// Note that mounted paths are already watched by default.
     #[structopt(short, long = "--watch", number_of_values = 1)]
     pub(crate) watched_paths: Vec<PathBuf>,
+
+    /// The debounce duration (in ms) for watching paths.
+    ///
+    /// Debouncing means that if a watch-event arrived, we are not immediately
+    /// triggering a reload. Instead we wait for this duration and see if any
+    /// other events arrive during this period. Whenever an event arrives, we
+    /// reset the timer (so we could wait indefinitely).
+    #[structopt(
+        long = "--debounce",
+        default_value = "200",
+        parse(try_from_str = parse_duration)
+    )]
+    pub(crate) debounce_duration: Duration,
 }
 
 fn parse_mount(s: &str) -> Result<Mount, &'static str> {
@@ -128,6 +141,11 @@ fn parse_mount(s: &str) -> Result<Mount, &'static str> {
     }
 
     Ok(Mount { uri_path, fs_path})
+}
+
+fn parse_duration(s: &str) -> Result<Duration, &'static str> {
+    let ms = s.parse::<u64>().map_err(|_| "failed to parse as positive integer")?;
+    Ok(Duration::from_millis(ms))
 }
 
 impl Args {

@@ -10,6 +10,7 @@ All notable changes to the penguin **CLI app** will be documented here.
   browser sessions will reload automatically if anything changes.
 - Add `--no-auto-watch` flag to disable auto watch behavior.
 - Add `-w/--watch` option to specify additional watched paths.
+- Add `--debounce` flag to set the debounce duration for watched paths.
 
 
 ## 0.1.0 - 2021-03-03

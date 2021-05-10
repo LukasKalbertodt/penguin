@@ -34,9 +34,9 @@ pub(crate) async fn run(
 
     if !options.no_auto_watch {
         let paths = mounts.into_iter().map(|m| &m.fs_path).chain(&options.watched_paths);
-        watch(controller, paths)?;
+        watch(controller, options.debounce_duration, paths)?;
     } else if !options.watched_paths.is_empty() {
-        watch(controller, &options.watched_paths)?;
+        watch(controller, options.debounce_duration, &options.watched_paths)?;
     }
 
     // Nice output of what is being done
@@ -79,7 +79,11 @@ pub(crate) async fn run(
     Ok(())
 }
 
-fn watch<'a>(controller: Controller, paths: impl IntoIterator<Item = &'a PathBuf>) -> Result<()> {
+fn watch<'a>(
+    controller: Controller,
+    debounce_duration: Duration,
+    paths: impl IntoIterator<Item = &'a PathBuf>,
+) -> Result<()> {
     use std::sync::mpsc::{channel, RecvTimeoutError};
     use notify::{RawEvent, RecursiveMode, Watcher};
 
@@ -90,9 +94,6 @@ fn watch<'a>(controller: Controller, paths: impl IntoIterator<Item = &'a PathBuf
             None =>  "???".into(),
         }
     }
-
-    // We could make this configurable via CLI, but I'm not sure if it's worth it.
-    const DEBOUNCE_DURATION: Duration = Duration::from_millis(200);
 
     // Create an configure watcher.
     let (tx, rx) = channel();
@@ -113,13 +114,13 @@ fn watch<'a>(controller: Controller, paths: impl IntoIterator<Item = &'a PathBuf
             debug!(
                 "Received watch-event for '{}'. Debouncing now for {:?}.",
                 pretty_path(&event),
-                DEBOUNCE_DURATION,
+                debounce_duration,
             );
 
             // Debounce. We loop forever until no new event arrived for
-            // `DEBOUNCE_DURATION`.
+            // `debounce_duration`.
             loop {
-                match rx.recv_timeout(DEBOUNCE_DURATION) {
+                match rx.recv_timeout(debounce_duration) {
                     Ok(event) => trace!("Debounce interrupted by '{}'", pretty_path(&event)),
                     Err(RecvTimeoutError::Timeout) => break,
                     Err(RecvTimeoutError::Disconnected) => return,
