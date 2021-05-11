@@ -1,4 +1,4 @@
-use std::{env, path::{Path, PathBuf}, thread, time::Duration};
+use std::{env, ops::Deref, path::Path, thread, time::Duration};
 
 use anyhow::{Context, Result};
 use log::{debug, info, trace, LevelFilter};
@@ -32,11 +32,19 @@ pub(crate) async fn run(
     let config = builder.validate().context("invalid penguin config")?;
     let (server, controller) = Server::build(config.clone());
 
-    if !options.no_auto_watch {
-        let paths = mounts.into_iter().map(|m| &m.fs_path).chain(&options.watched_paths);
-        watch(controller, options.debounce_duration, paths)?;
+    let watched_paths = if !options.no_auto_watch {
+        mounts.into_iter()
+            .map(|m| &*m.fs_path)
+            .chain(options.watched_paths.iter().map(Deref::deref))
+            .collect()
     } else if !options.watched_paths.is_empty() {
-        watch(controller, options.debounce_duration, &options.watched_paths)?;
+        options.watched_paths.iter().map(Deref::deref).collect()
+    } else {
+        vec![]
+    };
+
+    if !watched_paths.is_empty() {
+        watch(controller, options.debounce_duration, &watched_paths)?;
     }
 
     // Nice output of what is being done
@@ -47,7 +55,7 @@ pub(crate) async fn run(
         );
 
         if !args.is_quiet() {
-            pretty_print_config(&config, args);
+            pretty_print_config(&config, args, &watched_paths);
         }
     }
 
@@ -82,7 +90,7 @@ pub(crate) async fn run(
 fn watch<'a>(
     controller: Controller,
     debounce_duration: Duration,
-    paths: impl IntoIterator<Item = &'a PathBuf>,
+    paths: &[&Path],
 ) -> Result<()> {
     use std::sync::mpsc::{channel, RecvTimeoutError};
     use notify::{RawEvent, RecursiveMode, Watcher};
@@ -136,7 +144,7 @@ fn watch<'a>(
     Ok(())
 }
 
-fn pretty_print_config(config: &Config, args: &Args) {
+fn pretty_print_config(config: &Config, args: &Args, watched_paths: &[&Path]) {
     // Routing description
     println!();
     bunt::println!("   {$cyan+bold}▸ Routing:{/$}");
@@ -162,6 +170,15 @@ fn pretty_print_config(config: &Config, args: &Args) {
         bunt::println!("     ╰╴ All remaining requests are forwarded to {[green+intense]}", proxy);
     } else {
         bunt::println!("     ╰╴ All remaining requests will be responded to with 404");
+    }
+
+    if !watched_paths.is_empty() {
+        println!();
+        bunt::println!("   {$cyan+bold}▸ Watching:{/$} {$dimmed}(reloading on file change){/$}");
+        for p in watched_paths {
+            let canonical = p.canonicalize();
+            bunt::println!("     • {[green]}", canonical.as_deref().unwrap_or(p).display());
+        }
     }
 
     // Random hints
