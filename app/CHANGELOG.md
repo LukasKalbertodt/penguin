@@ -4,10 +4,18 @@ All notable changes to the penguin **CLI app** will be documented here.
 
 
 ## [Unreleased]
-### Added
-- Add `--open` flag to open the browser automatically
+
+
+## [0.2.0] - 2021-05-11
+
+Updated the library to v0.1.2 ⇒ [check its changelog](../lib/CHANGELOG.md).
+
+### Breaking
 - Mounted file system paths are now automatically watched for file changes. The
   browser sessions will reload automatically if anything changes.
+
+### Added
+- Add `--open` flag to open the browser automatically.
 - Add `--no-auto-watch` flag to disable auto watch behavior.
 - Add `-w/--watch` option to specify additional watched paths.
 - Add `--debounce` flag to set the debounce duration for watched paths.
@@ -18,4 +26,5 @@ All notable changes to the penguin **CLI app** will be documented here.
 - Everything
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.1.0...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.0...HEAD
+[0.2.0]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.1.0...app-v0.2.0
