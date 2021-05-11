@@ -29,5 +29,5 @@ All notable changes to the penguin **library** will be documented here.
 
 
 [Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.2...HEAD
-[0.1.1]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.1...lib-v0.1.2
+[0.1.2]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.1...lib-v0.1.2
 [0.1.1]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.0...lib-v0.1.1
