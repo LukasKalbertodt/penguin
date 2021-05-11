@@ -13,6 +13,18 @@ Browser sessions can reload themselves (e.g. when a file changes) or show an ove
 Penguin is available both as a command line application (`penguin-app` on crates.io) and as a library. For for more information on the library, see [its documentation](https://docs.rs/penguin). The rest of this document will mainly talk about the CLI app.
 
 
+## Example
+
+<p align="center">
+    <img src=".github/readme-screenshot.png" width="92%"></img>
+</p>
+
+- `penguin serve .` serves the current directory as file server
+- `penguin proxy localhost:3000` forwards all requests to `http://localhost:3000`.
+- `-m uri_path:fs_path` allows you to mount additional directories in the router.
+- `penguin reload` reloads all active browser sessions.
+
+
 ## Installation
 
 For now, you have to compile the app yourself. It's easiest to install it from
@@ -25,17 +37,43 @@ cargo install penguin-app
 Don't worry about the `-app` suffix: the installed binary is called `penguin`.
 
 
-## Example
+## CLI Usage
 
-<p align="center">
-    <img src=".github/readme-screenshot.png" width="92%"></img>
-</p>
+There are two main "entry points": `penguin proxy <target>` and `penguin serve <directory>`.
+The `proxy` subcommand is useful if you have some (backend) webserver on your own, e.g. to provide an API.
+The `serve` subcommand is useful if you only have static files that need to be served, e.g. for static site generators or backend-less single page applications.
+
+In either case, you can *mount* additional directories at an URL path with `-m/--mount`.
+The syntax is `-m <url-path>:<fs-path>`, for example `-m fonts:frontend/static`.
+An HTTP request for `/fonts/foo.woff2` would be answered with the file `frontend/static/foo.woff2` or with 404 if said file does not exist.
+
+All paths that are served by Penguin are automatically watched by default.
+This means that any file change in any of those directories will lead to all browser sessions reloading automatically.
+You can watch additional paths (that are not mounted/served) with `-w/--watch`.
+
+Reloading all active browser sessions can also be done manually via `penguin reload`.
+This is intended to be used at the end of your build scripts.
+Note that Penguin is not a build system or task executor!
+So you are mostly expected to combine it with other tools, like [`watchexec`](https://github.com/watchexec/watchexec), [`cargo watch`](https://github.com/passcod/cargo-watch) or others.
+I am also working on [`floof`](https://github.com/LukasKalbertodt/floof/), which is a WIP file-watcher and task-runner/build-system that uses Penguin under the hood to provide a dev server.
+
+Penguins output can be modified with `-v/-vv` and the log level (set via `-l` or `RUST_LOG`).
+
+For the full CLI documentation run `penguin --help` or `penguin <subcommand> --help`.
 
 
-- `penguin serve .` serves the current directory as file server
-- `penguin proxy localhost:3000` forwards all requests to `http://localhost:3000`.
-- `-m uri_path:fs_path` allows you to mount additional directories in the router.
-- `penguin reload` reloads all active browser sessions.
+## Project status and "using in production"
+
+This project is fairly young and not well tested.
+However, it already serves as a useful development tool for me.
+I'm interested in making it useful for as many people as possible without increasing the project's scope too much.
+
+I am looking for **Community Feedback**: please speak your mind in [this issue](https://github.com/LukasKalbertodt/penguin/issues/6).
+Especially if you have a use case that is not yet well served by Penguin, I'd like to know about that!
+
+"Can I use Penguin in production?". **No, absolutely not!** This is a
+development tool only and you should not open up a Penguin server to the public.
+There are probably a gazillion attack vectors.
 
 
 ## Versioning and stability guarantees
@@ -50,22 +88,6 @@ mostly follows the usual semantic versioning guidelines.
   of the file server.
 - HTTP headers in server replies might be added (or potentially even removed)
   even in minor version bumps.
-
-
-## Project status and "using in production"
-
-This project is very young and not well tested. It already serves as a useful
-development tool for me. I'm interested in making it useful for as many people
-as possible without increasing the project's scope too much.
-
-I am looking for **Community Feedback**: please speak your mind in [this
-issue](https://github.com/LukasKalbertodt/penguin/issues/6). Especially if you
-have a use case that is not yet well served by Penguin, I'd like to know about
-that.
-
-"Can I use Penguin in production?". **No, absolutely not!** This is a
-development tool only and you should not open up a Penguin server to the public.
-There are probably a gazillion attack vectors.
 
 
 <br />
