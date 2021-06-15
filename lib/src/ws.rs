@@ -1,5 +1,5 @@
 use futures::{SinkExt, StreamExt};
-use hyper_tungstenite::{HyperWebsocket, tungstenite::Message};
+use hyper_tungstenite::{HyperWebsocket, tungstenite::{Error, Message, error::ProtocolError}};
 use tokio::sync::broadcast::{Receiver, error::RecvError};
 
 use super::Action;
@@ -59,10 +59,18 @@ pub(crate) async fn handle_connection(
                     // function.
                     None | Some(Ok(Message::Close(_))) => break,
 
+                    // We catch this particular error since it happens a lot
+                    // when a tab is reloading and the WS connection isn't
+                    // properly closed. This is nothing to worry about and we
+                    // just stop/drop the connection.
+                    Some(Err(Error::Protocol(ProtocolError::ResetWithoutClosingHandshake))) => {
+                        break;
+                    }
+
+                    // All other errors get shown as warnings.
                     Some(Err(e)) => {
                         log::warn!(
-                            "Error receiving unexpected WS message. Shutting down \
-                                WS connection. Error: {}",
+                            "Error receiving WS message. Shutting down WS connection. Error: {}",
                             e,
                         );
                         break;
