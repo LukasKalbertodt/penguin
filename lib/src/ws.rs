@@ -59,6 +59,24 @@ pub(crate) async fn handle_connection(
                     // function.
                     None | Some(Ok(Message::Close(_))) => break,
 
+                    // The library tungstenite already handles ping requests
+                    // internally, but we still have to "call into the library"
+                    // for the pong packet to actually get sent.
+                    Some(Ok(Message::Ping(_))) => {
+                        match websocket.flush().await {
+                            // We explicitly ignore a couple of errors related
+                            // to a closed connection. If the connection is
+                            // closed, we do not care that our pong send failed.
+                            Ok(_)
+                            | Err(Error::ConnectionClosed)
+                            | Err(Error::AlreadyClosed)
+                            | Err(Error::Protocol(ProtocolError::ResetWithoutClosingHandshake))
+                            | Err(Error::Protocol(ProtocolError::SendAfterClosing)) => {}
+
+                            Err(e) => log::warn!("Error sending pong WS packet: {}", e),
+                        }
+                    }
+
                     // We catch this particular error since it happens a lot
                     // when a tab is reloading and the WS connection isn't
                     // properly closed. This is nothing to worry about and we
