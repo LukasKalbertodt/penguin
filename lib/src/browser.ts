@@ -33,10 +33,11 @@ function tryReconnect() {
     const DELAY_BETWEEN_RETRIES = 2000;
     const RETRY_COUNT_BEFORE_GIVING_UP = 30;
 
-    function connect() {
+    function connect(unregister: () => void) {
         const socket = new WebSocket(wsUri);
         socket.addEventListener("open", () => {
             console.log("Reestablished connection: reloading...");
+            unregister();
             location.reload();
         });
     }
@@ -44,7 +45,7 @@ function tryReconnect() {
     function retryRegularlyForAWhile() {
         let count = 0;
         const interval = setInterval(() => {
-            connect();
+            connect(() => clearInterval(interval));
 
             count += 1;
             if (count > RETRY_COUNT_BEFORE_GIVING_UP) {
@@ -58,12 +59,13 @@ function tryReconnect() {
     // changes. Whenever the page visibility changes to "visible", we
     // immediately retry and also start the retry loop again.
     retryRegularlyForAWhile();
-    document.addEventListener("visibilitychange", () => {
+    const onVisibilityChange = () => {
         if (document.visibilityState === "visible") {
-            connect();
+            connect(() => document.removeEventListener("visibilitychange", onVisibilityChange));
             retryRegularlyForAWhile();
         }
-    });
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 }
 
 function onConnectionError() {
