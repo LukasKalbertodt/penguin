@@ -1,6 +1,16 @@
-use std::{cmp::min, sync::{Arc, atomic::{AtomicBool, Ordering}}, time::Duration};
+use std::{
+    cmp::min,
+    convert::TryFrom,
+    io::Read,
+    sync::{Arc, atomic::{AtomicBool, Ordering}},
+    time::Duration,
+};
 
-use hyper::{Body, Client, Request, Response, StatusCode, Uri, header::{self, HeaderValue}};
+use hyper::{
+    Body, Client, Request, Response, StatusCode, Uri,
+    body::Bytes,
+    header::{self, HeaderValue},
+};
 use hyper_tls::HttpsConnector;
 use tokio::sync::broadcast::Sender;
 
@@ -62,13 +72,39 @@ fn adjust_request(req: &mut Request<Body>, target: &ProxyTarget) {
     *req.uri_mut() = uri.clone();
 
     // If the `host` header is set, we need to adjust it, too.
-    if let Some(host) = req.headers_mut().get_mut("host") {
+    if let Some(host) = req.headers_mut().get_mut(header::HOST) {
         // `http::Uri` already does not parse non-ASCII hosts. Unicode hosts
         // have to be encoded as punycode.
         *host = HeaderValue::from_str(target.authority.as_str())
             .expect("bug: URI authority should be ASCII");
     }
+
+    // Deal with compression.
+    if let Some(header) = req.headers_mut().get_mut(header::ACCEPT_ENCODING) {
+        // In a production product, panicking here is not OK. But all encodings
+        // listed in [1] and the syntax described in [2] only contain ASCII
+        // bytes. So non-ASCII bytes here are highly unlikely.
+        //
+        // [1]: https://www.iana.org/assignments/http-parameters/http-parameters.xml
+        // [2]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Encoding
+        let value = header.to_str()
+            .expect("'accept-encoding' header value contains non-ASCII bytes");
+        let new_value = filter_encodings(&value);
+
+        if new_value.is_empty() {
+            req.headers_mut().remove(header::ACCEPT_ENCODING);
+        } else {
+            // It was ASCII before and we do not add any non-ASCII values.
+            *header = HeaderValue::try_from(new_value)
+                .expect("bug: non-ASCII values in new 'accept-encoding' header");
+        }
+    }
 }
+
+/// We support only gzip and brotli. But according to this statistics, those two
+/// make up the vast majority of requests:
+/// https://almanac.httparchive.org/en/2019/compression
+const SUPPORTED_COMPRESSIONS: &[&str] = &["gzip", "br", "identity"];
 
 async fn adjust_response(response: Response<Body>, ctx: &Context, uri: &Uri) -> Response<Body> {
     let content_type = response.headers().get(header::CONTENT_TYPE);
@@ -81,7 +117,7 @@ async fn adjust_response(response: Response<Body>, ctx: &Context, uri: &Uri) -> 
 
     // The response is HTML: we need to download it completely and
     // inject our script.
-    let (parts, body) = response.into_parts();
+    let (mut parts, body) = response.into_parts();
     let body = match hyper::body::to_bytes(body).await {
         Ok(body) => body,
         Err(e) => {
@@ -91,15 +127,48 @@ async fn adjust_response(response: Response<Body>, ctx: &Context, uri: &Uri) -> 
         }
     };
 
-    let new_body = inject::into(&body, &ctx.config);
-    let new_len = new_body.len();
-    let new_body = Body::from(new_body);
+    // Uncompress if necessary. All this allocates more than necessary, but I'd
+    // rather keep easier code in this case, as performance is unlikely to
+    // matter.
+    let new_body = match parts.headers.get(header::CONTENT_ENCODING).map(|v| v.as_bytes()) {
+        None => Bytes::from(inject::into(&body, &ctx.config)),
 
-    let mut response = Response::from_parts(parts, new_body);
-    if let Some(content_len) = response.headers_mut().get_mut(header::CONTENT_LENGTH) {
-        *content_len = new_len.into();
+        Some(b"gzip") => {
+            let mut decompressed = Vec::new();
+            flate2::read::GzDecoder::new(&*body).read_to_end(&mut decompressed)
+                .expect("unexpected error while decompressing GZIP");
+            let injected = inject::into(&decompressed, &ctx.config);
+            let mut out = Vec::new();
+            flate2::read::GzEncoder::new(&*injected, flate2::Compression::best())
+                .read_to_end(&mut out)
+                .expect("unexpected error while compressing GZIP");
+            Bytes::from(out)
+        }
+
+        Some(b"br") => {
+            let mut decompressed = Vec::new();
+            brotli::BrotliDecompress(&mut &*body, &mut decompressed)
+                .expect("unexpected error while decompressing Brotli");
+            let injected = inject::into(&decompressed, &ctx.config);
+            let mut out = Vec::new();
+            brotli::BrotliCompress(&mut &*injected, &mut out, &Default::default())
+                .expect("unexpected error while compressing Brotli");
+            Bytes::from(out)
+        }
+
+        Some(other) => {
+            log::warn!(
+                "Unsupported content encoding '{}'. Not injecting script!",
+                String::from_utf8_lossy(other),
+            );
+            body
+        }
+    };
+
+    if let Some(content_len) = parts.headers.get_mut(header::CONTENT_LENGTH) {
+        *content_len = new_body.len().into();
     }
-    response
+    Response::from_parts(parts, new_body.into())
 }
 
 fn gateway_error(msg: &str, e: hyper::Error, config: &Config) -> Response<Body> {
@@ -158,4 +227,45 @@ fn start_polling(ctx: &ProxyContext, target: &ProxyTarget, actions: Sender<Actio
             }
         }
     });
+}
+
+/// Filter the "accept-encoding" encodings in the header value `orig` and return
+/// a new value only containing the ones we support.
+fn filter_encodings(orig: &str) -> String {
+    let allowed_values = orig.split(',')
+        .map(|part| part.trim())
+        .filter(|part| {
+            let encoding = part.split_once(';').map(|p| p.0).unwrap_or(part);
+            SUPPORTED_COMPRESSIONS.contains(&encoding)
+        });
+
+    let mut new_value = String::new();
+    for (i, part) in allowed_values.enumerate() {
+        if i != 0 {
+            new_value.push_str(", ");
+        }
+        new_value.push_str(part);
+    }
+    new_value
+}
+
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn encoding_filter() {
+        use super::filter_encodings as filter;
+
+        assert_eq!(filter(""), "");
+        assert_eq!(filter("gzip"), "gzip");
+        assert_eq!(filter("br"), "br");
+        assert_eq!(filter("gzip, br"), "gzip, br");
+        assert_eq!(filter("gzip, deflate"), "gzip");
+        assert_eq!(filter("deflate, gzip"), "gzip");
+        assert_eq!(filter("gzip, deflate, br"), "gzip, br");
+        assert_eq!(filter("deflate, gzip, br"), "gzip, br");
+        assert_eq!(filter("gzip, br, deflate"), "gzip, br");
+        assert_eq!(filter("deflate"), "");
+        assert_eq!(filter("br;q=1.0, deflate;q=0.5, gzip;q=0.8, *;q=0.1"), "br;q=1.0, gzip;q=0.8");
+    }
 }
