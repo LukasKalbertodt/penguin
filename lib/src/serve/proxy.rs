@@ -1,6 +1,6 @@
 use std::{
     cmp::min,
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     io::Read,
     sync::{Arc, atomic::{AtomicBool, Ordering}},
     time::Duration,
@@ -10,6 +10,7 @@ use hyper::{
     Body, Client, Request, Response, StatusCode, Uri,
     body::Bytes,
     header::{self, HeaderValue},
+    http::uri::Scheme,
 };
 use hyper_tls::HttpsConnector;
 use tokio::sync::broadcast::Sender;
@@ -51,7 +52,7 @@ pub(crate) async fn forward(
     log::trace!("Forwarding request to proxy target {}", uri);
     let client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
     match client.request(req).await {
-        Ok(response) => adjust_response(response, ctx, &uri).await,
+        Ok(response) => adjust_response(response, ctx, &uri, target, &ctx.config).await,
         Err(e) => {
             log::warn!("Failed to reach proxy target '{}': {}", uri, e);
             let msg = format!("Failed to reach {}\n\n{}", uri, e);
@@ -106,7 +107,18 @@ fn adjust_request(req: &mut Request<Body>, target: &ProxyTarget) {
 /// https://almanac.httparchive.org/en/2019/compression
 const SUPPORTED_COMPRESSIONS: &[&str] = &["gzip", "br", "identity"];
 
-async fn adjust_response(response: Response<Body>, ctx: &Context, uri: &Uri) -> Response<Body> {
+async fn adjust_response(
+    mut response: Response<Body>,
+    ctx: &Context,
+    uri: &Uri,
+    target: &ProxyTarget,
+    config: &Config,
+) -> Response<Body> {
+    // Rewrite `location` header if it's present.
+    if let Some(header) = response.headers_mut().get_mut(header::LOCATION) {
+        rewrite_location(header, target, config);
+    }
+
     let content_type = response.headers().get(header::CONTENT_TYPE);
     let is_html = content_type.map_or(false, |v| v.as_ref().starts_with(b"text/html"));
     if !is_html {
@@ -169,6 +181,40 @@ async fn adjust_response(response: Response<Body>, ctx: &Context, uri: &Uri) -> 
         *content_len = new_body.len().into();
     }
     Response::from_parts(parts, new_body.into())
+}
+
+fn rewrite_location(header: &mut HeaderValue, target: &ProxyTarget, config: &Config) {
+    let value = match std::str::from_utf8(header.as_bytes()) {
+        Err(_) => {
+            log::warn!("Non UTF-8 'location' header: not rewriting");
+            return;
+        }
+        Ok(v) => v,
+    };
+
+    let mut uri = match value.parse::<Uri>() {
+        Err(_) => {
+            log::warn!("Could not parse 'location' header as URI: not rewriting");
+            return;
+        }
+        Ok(uri) => uri.into_parts(),
+    };
+
+    // If the redirect points to the proxy target itself (i.e. an internal
+    // redirect), we change the `location` header so that the browser changes
+    // the path & query, but stays on the Penguin host.
+    if uri.authority.as_ref() == Some(&target.authority) {
+        // Penguin itself only listens on HTTP
+        uri.scheme = Some(Scheme::HTTP);
+        let authority = config.bind_addr.to_string()
+            .try_into()
+            .expect("bind addr is not a valid authority");
+        uri.authority = Some(authority);
+
+        let uri = Uri::from_parts(uri).expect("bug: failed to build URI");
+        *header = HeaderValue::from_bytes(uri.to_string().as_bytes())
+            .expect("bug: new 'location' is invalid header value");
+    }
 }
 
 fn gateway_error(msg: &str, e: hyper::Error, config: &Config) -> Response<Body> {
