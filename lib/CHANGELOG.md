@@ -16,6 +16,11 @@ All notable changes to the penguin **library** will be documented here.
 ### Fixed
 - When using the proxy, the `host` HTTP-header is adjusted to the proxy target
   host (instead of the original `localhost:4090` that the browser sends).
+- Correctly handle compression in proxy: gzip and brotli compression is
+  supported and the HTTP body is decompressed before the reload script is
+  injected. This was just totally broken before. The `accept-encoding` header
+  of the request is also adjusted to not list anything but `gzip` and `br`.
+- Rewrite `location` header to make HTTP redirects work with proxy.
 
 ## [0.1.3] - 2021-07-18
 ### Fixed
