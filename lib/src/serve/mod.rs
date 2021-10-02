@@ -8,6 +8,7 @@ use hyper::{
 };
 use tokio::sync::broadcast::Sender;
 
+use crate::serve::proxy::ProxyContext;
 use super::{Action, Config};
 
 mod fs;
@@ -17,15 +18,18 @@ mod proxy;
 pub(crate) async fn run(config: Config, actions: Sender<Action>) -> Result<(), hyper::Error> {
     let addr = config.bind_addr;
 
-    let config = Arc::new(config);
+    let ctx = Arc::new(Context {
+        config,
+        proxy: ProxyContext::new(),
+    });
     let make_service = make_service_fn(move |_| {
-        let config = Arc::clone(&config);
+        let ctx = Arc::clone(&ctx);
         let actions = actions.clone();
 
         async {
             Ok::<_, Infallible>(service_fn(move |req| {
                 handle_internal_errors(
-                    handle(req, Arc::clone(&config), actions.clone())
+                    handle(req, Arc::clone(&ctx), actions.clone())
                 )
             }))
         }
@@ -73,10 +77,15 @@ async fn handle_internal_errors(
     }
 }
 
+pub(crate) struct Context {
+    config: Config,
+    proxy: ProxyContext,
+}
+
 /// Handles a single incoming request.
 async fn handle(
     req: Request<Body>,
-    config: Arc<Config>,
+    ctx: Arc<Context>,
     actions: Sender<Action>,
 ) -> Response<Body> {
     log::trace!(
@@ -85,21 +94,21 @@ async fn handle(
         req.uri().path_and_query().unwrap_or(&PathAndQuery::from_static("/")),
     );
 
-    if req.uri().path().starts_with(&config.control_path) {
-        handle_control(req, config, actions).await
-    } else if let Some(response) = fs::try_serve(&req, &config).await {
+    if req.uri().path().starts_with(&ctx.config.control_path) {
+        handle_control(req, &ctx.config, actions).await
+    } else if let Some(response) = fs::try_serve(&req, &ctx.config).await {
         response
-    } else if let Some(proxy) = &config.proxy {
-        proxy::forward(req, proxy, config.clone()).await
+    } else if let Some(proxy) = &ctx.config.proxy {
+        proxy::forward(req, proxy, &ctx, actions).await
     } else {
-        not_found(&config)
+        not_found(&ctx.config)
     }
 }
 
 /// Handles "control requests", i.e. request to the control path.
 async fn handle_control(
     req: Request<Body>,
-    config: Arc<Config>,
+    config: &Config,
     actions: Sender<Action>,
 ) -> Response<Body> {
     log::trace!("Handling request to HTTP control API...");
