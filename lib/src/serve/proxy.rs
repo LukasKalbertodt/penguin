@@ -35,7 +35,24 @@ pub(crate) async fn forward(
     ctx: &Context,
     actions: Sender<Action>,
 ) -> Response<Body> {
-    // Build new URI and change the given request.
+    adjust_request(&mut req, target);
+    let uri = req.uri().clone();
+
+    log::trace!("Forwarding request to proxy target {}", uri);
+    let client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
+    match client.request(req).await {
+        Ok(response) => adjust_response(response, ctx, &uri).await,
+        Err(e) => {
+            log::warn!("Failed to reach proxy target '{}': {}", uri, e);
+            let msg = format!("Failed to reach {}\n\n{}", uri, e);
+            start_polling(&ctx.proxy, target, actions);
+            gateway_error(&msg, e, &ctx.config)
+        }
+    }
+}
+
+fn adjust_request(req: &mut Request<Body>, target: &ProxyTarget) {
+    // Change the URI to the proxy target.
     let uri = {
         let mut parts = req.uri().clone().into_parts();
         parts.scheme = Some(target.scheme.clone());
@@ -44,55 +61,45 @@ pub(crate) async fn forward(
     };
     *req.uri_mut() = uri.clone();
 
-    // If the `host` header is set, we need to adjust it.
+    // If the `host` header is set, we need to adjust it, too.
     if let Some(host) = req.headers_mut().get_mut("host") {
         // `http::Uri` already does not parse non-ASCII hosts. Unicode hosts
         // have to be encoded as punycode.
         *host = HeaderValue::from_str(target.authority.as_str())
             .expect("bug: URI authority should be ASCII");
     }
+}
 
-    log::trace!("Forwarding request to proxy target {}", uri);
-    let client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
-    match client.request(req).await {
-        Ok(response) => {
-            let content_type = response.headers().get(header::CONTENT_TYPE);
-            if content_type.map_or(false, |v| v.as_ref().starts_with(b"text/html")) {
-                log::trace!("Response from proxy is HTML: injecting script");
-
-                // The response is HTML: we need to download it completely and
-                // inject our script.
-                let (parts, body) = response.into_parts();
-                let body = match hyper::body::to_bytes(body).await {
-                    Ok(body) => body,
-                    Err(e) => {
-                        log::warn!("Failed to download full response from proxy target");
-                        let msg = format!("Failed to download response from {}\n\n{}", uri, e);
-                        return gateway_error(&msg, e, &ctx.config);
-                    }
-                };
-
-                let new_body = inject::into(&body, &ctx.config);
-                let new_len = new_body.len();
-                let new_body = Body::from(new_body);
-
-                let mut response = Response::from_parts(parts, new_body);
-                if let Some(content_len) = response.headers_mut().get_mut(header::CONTENT_LENGTH) {
-                    *content_len = new_len.into();
-                }
-                response
-            } else {
-                response
-            }
-        }
-
-        Err(e) => {
-            log::warn!("Failed to reach proxy target");
-            let msg = format!("Failed to reach {}\n\n{}", uri, e);
-            start_polling(&ctx.proxy, target, actions);
-            gateway_error(&msg, e, &ctx.config)
-        }
+async fn adjust_response(response: Response<Body>, ctx: &Context, uri: &Uri) -> Response<Body> {
+    let content_type = response.headers().get(header::CONTENT_TYPE);
+    let is_html = content_type.map_or(false, |v| v.as_ref().starts_with(b"text/html"));
+    if !is_html {
+        return response;
     }
+
+    log::trace!("Response from proxy is HTML: injecting script");
+
+    // The response is HTML: we need to download it completely and
+    // inject our script.
+    let (parts, body) = response.into_parts();
+    let body = match hyper::body::to_bytes(body).await {
+        Ok(body) => body,
+        Err(e) => {
+            log::warn!("Failed to download full response from proxy target");
+            let msg = format!("Failed to download response from {}\n\n{}", uri, e);
+            return gateway_error(&msg, e, &ctx.config);
+        }
+    };
+
+    let new_body = inject::into(&body, &ctx.config);
+    let new_len = new_body.len();
+    let new_body = Body::from(new_body);
+
+    let mut response = Response::from_parts(parts, new_body);
+    if let Some(content_len) = response.headers_mut().get_mut(header::CONTENT_LENGTH) {
+        *content_len = new_len.into();
+    }
+    response
 }
 
 fn gateway_error(msg: &str, e: hyper::Error, config: &Config) -> Response<Body> {
