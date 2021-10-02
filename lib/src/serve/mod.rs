@@ -92,7 +92,7 @@ async fn handle(
     } else if let Some(proxy) = &config.proxy {
         proxy::forward(req, proxy, config.clone()).await
     } else {
-        not_found()
+        not_found(&config)
     }
 }
 
@@ -168,13 +168,18 @@ fn bad_request(msg: &'static str) -> Response<Body> {
         .expect("bug: invalid response")
 }
 
-fn not_found() -> Response<Body> {
+fn not_found(config: &Config) -> Response<Body> {
+    const NOT_FOUND_HTML: &str = include_str!("../assets/not-found.html");
+
     log::debug!("Responding with 404 NOT FOUND");
+    let html = NOT_FOUND_HTML.replace("{{ reload_script }}", &crate::inject::script(config));
 
     Response::builder()
         .status(StatusCode::NOT_FOUND)
+        .header("Content-Type", "text/html")
+        .header("Content-Length", html.len().to_string())
         .header("Server", SERVER_HEADER)
-        .body(Body::from("Not found\n"))
+        .body(html.into())
         .expect("bug: invalid response")
 }
 

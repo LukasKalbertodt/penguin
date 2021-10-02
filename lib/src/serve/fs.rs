@@ -47,7 +47,7 @@ async fn serve(
         ($path:expr) => {
             match fs::canonicalize($path).await {
                 Ok(v) => v,
-                Err(e) if e.kind() == ErrorKind::NotFound => return not_found(),
+                Err(e) if e.kind() == ErrorKind::NotFound => return not_found(config),
                 Err(e) => panic!(
                     "unhandled error: could not canonicalize path '{}': {}",
                     $path.display(),
@@ -71,7 +71,7 @@ async fn serve(
 
     // Dispatch depending on whether it's a file or directory.
     if !path.exists() {
-        not_found()
+        not_found(config)
     } else if path.is_file() {
         log::trace!("Serving requested file");
         serve_file(&path, config).await
