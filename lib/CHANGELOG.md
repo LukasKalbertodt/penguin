@@ -13,6 +13,10 @@ All notable changes to the penguin **library** will be documented here.
   once the proxy is reachable again. This is done by regularly polling the
   proxy from the Penguin server.
 
+### Fixed
+- When using the proxy, the `host` HTTP-header is adjusted to the proxy target
+  host (instead of the original `localhost:4090` that the browser sends).
+
 ## [0.1.3] - 2021-07-18
 ### Fixed
 - Fix bug resulting in endless reloading if the proxy is slow

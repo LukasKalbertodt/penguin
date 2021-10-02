@@ -1,6 +1,6 @@
 use std::{cmp::min, sync::{Arc, atomic::{AtomicBool, Ordering}}, time::Duration};
 
-use hyper::{Body, Client, Request, Response, StatusCode, Uri, header};
+use hyper::{Body, Client, Request, Response, StatusCode, Uri, header::{self, HeaderValue}};
 use hyper_tls::HttpsConnector;
 use tokio::sync::broadcast::Sender;
 
@@ -43,6 +43,14 @@ pub(crate) async fn forward(
         Uri::from_parts(parts).expect("bug: invalid URI")
     };
     *req.uri_mut() = uri.clone();
+
+    // If the `host` header is set, we need to adjust it.
+    if let Some(host) = req.headers_mut().get_mut("host") {
+        // `http::Uri` already does not parse non-ASCII hosts. Unicode hosts
+        // have to be encoded as punycode.
+        *host = HeaderValue::from_str(target.authority.as_str())
+            .expect("bug: URI authority should be ASCII");
+    }
 
     log::trace!("Forwarding request to proxy target {}", uri);
     let client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
