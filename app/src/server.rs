@@ -73,10 +73,10 @@ pub(crate) async fn run(
 
             let url = format!("http://{}", bind_addr);
             match open::that(url) {
-                Ok(c) if c.success() => {}
-                other => bunt::println!(
-                    "{$yellow}Warning{/$}: couldn't open browser. Error: {:?}",
-                    other,
+                Ok(_) => {}
+                Err(e) => bunt::println!(
+                    "{$yellow}Warning{/$}: couldn't open browser. Error: {}",
+                    e,
                 ),
             }
         });

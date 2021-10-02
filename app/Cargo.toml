@@ -27,7 +27,7 @@ anyhow = "1"
 bunt = "0.2.4"
 log = "0.4"
 notify = "4"
-open = "1"
+open = "2"
 penguin = { version = "0.1.4", path = "../lib" }
 pretty_env_logger = "0.4"
 structopt = "0.3"

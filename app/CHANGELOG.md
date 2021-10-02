@@ -7,7 +7,8 @@ All notable changes to the penguin **CLI app** will be documented here.
 
 ## [0.2.2] - 2021-10-02
 
-Updated the library to v0.1.4 ⇒ [check its changelog](../lib/CHANGELOG.md#014---2021-09-02).
+- Updated the library to v0.1.4 ⇒ [check its changelog](../lib/CHANGELOG.md#014---2021-09-02).
+- Updated other dependencies.
 
 
 ## [0.2.1] - 2021-07-18
