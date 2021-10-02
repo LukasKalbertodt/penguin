@@ -15,19 +15,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
-    - name: Prepare cache key
-      run: |
-        cp Cargo.lock cache-fingerprint
-        echo $RUSTFLAGS >> cache-fingerprint
-        echo $(rustc -V) >> cache-fingerprint
     - name: Restore cargo cache
-      uses: actions/cache@v2
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('cache-fingerprint') }}
+      uses: Swatinem/rust-cache@v1.3.0
     - name: Install tsc
       run: npm install
       working-directory: lib
