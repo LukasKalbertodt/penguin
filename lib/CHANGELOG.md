@@ -5,6 +5,14 @@ All notable changes to the penguin **library** will be documented here.
 
 ## [Unreleased]
 
+## [0.1.4] - 2021-10-02
+### Improved
+- Include reload script in 404 response: now the page can still reload itself
+  after a 404 reply.
+- After a getting a gateway error, automatically reload all browser sessions
+  once the proxy is reachable again. This is done by regularly polling the
+  proxy from the Penguin server.
+
 ## [0.1.3] - 2021-07-18
 ### Fixed
 - Fix bug resulting in endless reloading if the proxy is slow
@@ -35,7 +43,8 @@ All notable changes to the penguin **library** will be documented here.
 - Everything
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.3...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.4...HEAD
+[0.1.4]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.3...lib-v0.1.4
 [0.1.3]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.2...lib-v0.1.3
 [0.1.2]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.1...lib-v0.1.2
 [0.1.1]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.0...lib-v0.1.1
