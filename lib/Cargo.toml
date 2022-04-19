@@ -34,3 +34,6 @@ tokio-util = { version = "0.6.3", features = ["codec"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"]}
+
+[features]
+vendored-openssl = ["hyper-tls/vendored"]
