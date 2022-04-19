@@ -5,6 +5,14 @@ All notable changes to the penguin **library** will be documented here.
 
 ## [Unreleased]
 
+## [0.1.5] - 2022-04-19
+### Added
+- Add feature `vendored-openssl` to compile `openssl` from source
+  [PR #10](https://github.com/LukasKalbertodt/penguin/pull/10) (Thanks @philipahlberg)
+
+### Improved
+- Updated dependencies
+
 ## [0.1.4] - 2021-10-02
 ### Improved
 - Include reload script in 404 response: now the page can still reload itself
@@ -52,7 +60,8 @@ All notable changes to the penguin **library** will be documented here.
 - Everything
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.4...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.5...HEAD
+[0.1.5]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.4...lib-v0.1.5
 [0.1.4]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.3...lib-v0.1.4
 [0.1.3]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.2...lib-v0.1.3
 [0.1.2]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.1...lib-v0.1.2
