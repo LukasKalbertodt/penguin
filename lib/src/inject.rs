@@ -5,10 +5,7 @@ use crate::Config;
 pub(crate) fn script(config: &Config) -> String {
     const JS_CODE: &str = include_str!("generated/browser.js");
 
-    let js = JS_CODE
-        .replace("{{ control_path }}", &config.control_path);
-
-    format!("<script>\n{}</script>", js)
+    JS_CODE.replace("{{ control_path }}", &config.control_path)
 }
 
 /// Injects our JS code into `input`. This function tries to find the closing
@@ -31,8 +28,12 @@ pub(crate) fn into(input: &[u8], config: &Config) -> Vec<u8> {
     // If we haven't found a closing body tag, we just insert our JS at the very
     // end.
     let insert_idx = body_close_idx.unwrap_or(input.len());
+
+    let control_path = &config.control_path;
+    let script_tag = format!(r#"<script src="{control_path}/client.js" defer></script>"#);
+
     let mut out = input[..insert_idx].to_vec();
-    out.extend_from_slice(script(config).as_bytes());
+    out.extend_from_slice(script_tag.as_bytes());
     out.extend_from_slice(&input[insert_idx..]);
     out
 }

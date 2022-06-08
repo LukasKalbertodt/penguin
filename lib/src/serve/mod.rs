@@ -132,6 +132,13 @@ async fn handle_control(
     } else {
         let subpath = req.uri().path().strip_prefix(&config.control_path).unwrap();
         match (req.method(), subpath) {
+            (&Method::GET, "/client.js") => {
+                Response::builder()
+                    .header("Content-Type", "application/javascript; charset=UTF-8")
+                    .body(Body::from(crate::inject::script(config)))
+                    .unwrap()
+            }
+
             (&Method::POST, "/reload") => {
                 // We ignore errors here: if there are no receivers, so be it.
                 // Although we might want to include the number of receivers in
