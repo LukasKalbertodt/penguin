@@ -180,7 +180,107 @@ async fn adjust_response(
     if let Some(content_len) = parts.headers.get_mut(header::CONTENT_LENGTH) {
         *content_len = new_body.len().into();
     }
+
+    // We might need to adjust `Content-Security-Policy` to allow including
+    // scripts from `self`. This is most likely already the case, but we have
+    // to make sure. If the header appears multiple times, all header values
+    // need to allow a thing for it to be allowed. Thus we can just modify all
+    // headers independently from one another.
+    if let header::Entry::Occupied(mut e) = parts.headers.entry(header::CONTENT_SECURITY_POLICY) {
+        e.iter_mut().for_each(rewrite_csp);
+    }
+
+
     Response::from_parts(parts, new_body.into())
+}
+
+/// We inject our own JS that connects via WS to the penguin server. These two
+/// things need to be allowed by the Content-Security-Policy. Usually they are,
+/// but in some cases we need to modify that header to allow for it.
+/// Unfortunately, it's a bit involved, but also fairly straight forward.
+fn rewrite_csp(header: &mut HeaderValue) {
+    use std::collections::{BTreeMap, btree_map::Entry};
+
+    // We have to parse the CSP. Compare section "2.2.1. Parse a serialized CSP"
+    // of TR CSP3: https://www.w3.org/TR/CSP3/#parse-serialized-policy
+    let mut directives = BTreeMap::new();
+    header.as_bytes()
+        // "strictly splitting on the U+003B SEMICOLON character (;)"
+        .split(|b| *b == b';')
+        // "If token is an empty string, or if token is not an ASCII string, continue."
+        .filter(|part| !part.is_empty())
+        .filter_map(|part| std::str::from_utf8(part).ok())
+        .for_each(|part| {
+            // "Strip leading and trailing ASCII whitespace" and then splitting
+            //  by whitespace to separate the directive name and all directive
+            //  values.
+            let mut split = part.trim().split_whitespace();
+            let name = split.next()
+                .expect("empty split iterator for non-empty string")
+                .to_ascii_lowercase();
+
+            match directives.entry(name) {
+                // "If policy’s directive set contains a directive whose name is
+                //  directive name, continue. Note: In this case, the user
+                //  agent SHOULD notify developers that a duplicate directive
+                //  was ignored. A console warning might be appropriate, for
+                //  example."
+                Entry::Occupied(entry) => {
+                    log::warn!("CSP malformed, second {} directive ignored", entry.key());
+                }
+
+                // "Append directive to policy’s directive set."
+                Entry::Vacant(entry) => {
+                    entry.insert(split.collect::<Vec<_>>());
+                }
+            }
+        });
+
+
+    // Of course, including the script/connect to self might still be allowed
+    // via other sources, like `http:`. But it also doesn't hurt to add `self`
+    // in those cases.
+    let scripts_from_self_allowed = directives.get("script-src")
+        .or_else(|| directives.get("default-src"))
+        .map_or(true, |v| v.contains(&"'self'") || v.contains(&"*"));
+
+    let connect_to_self_allowed = directives.get("connect-src")
+        .or_else(|| directives.get("default-src"))
+        .map_or(true, |v| v.contains(&"'self'") || v.contains(&"*"));
+
+
+    if scripts_from_self_allowed && connect_to_self_allowed {
+        log::trace!("CSP header already allows scripts from and connect to 'self', not modifying");
+        return;
+    }
+
+    // Add `self` to `script-src`/`connect-src`.
+    if !scripts_from_self_allowed {
+        let script_sources = directives.entry("script-src".to_owned()).or_default();
+        script_sources.retain(|src| *src != "'none'");
+        script_sources.push("'self'");
+    }
+    if !connect_to_self_allowed {
+        let script_sources = directives.entry("connect-src".to_owned()).or_default();
+        script_sources.retain(|src| *src != "'none'");
+        script_sources.push("'self'");
+    }
+
+    // Serialize parsed CSP into header value again.
+    let mut out = String::new();
+    for (name, values) in directives {
+        use std::fmt::Write;
+
+        out.push_str(&name);
+        values.iter().for_each(|v| write!(out, " {v}").unwrap());
+        out.push_str("; ");
+    }
+
+    // Above, we ignored all non-ASCII entries, so there shouldn't be a way our
+    // resulting string is non-ASCII.
+    log::trace!("Modified CSP header \nfrom {header:?} \nto   \"{out}\"");
+    *header = HeaderValue::from_str(&out)
+        .expect("modified CSP header has non-ASCII chars");
 }
 
 fn rewrite_location(header: &mut HeaderValue, target: &ProxyTarget, config: &Config) {
