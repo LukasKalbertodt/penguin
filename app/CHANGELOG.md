@@ -5,7 +5,13 @@ All notable changes to the penguin **CLI app** will be documented here.
 
 ## [Unreleased]
 
-## [0.2.2] - 2021-10-02
+
+## [0.2.4] - 2022-06-08
+
+- Updated the library to v0.1.6 ⇒ [check its changelog](../lib/CHANGELOG.md#016---2022-06-08).
+- Updated other dependencies.
+
+## [0.2.3] - 2021-10-02
 
 - Add feature `vendored-openssl` to compile `openssl` from source
   [PR #10](https://github.com/LukasKalbertodt/penguin/pull/10) (Thanks @philipahlberg)
@@ -43,7 +49,8 @@ Updated the library to v0.1.2 ⇒ [check its changelog](../lib/CHANGELOG.md#012-
 - Everything
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.3...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.4...HEAD
+[0.2.4]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.3...app-v0.2.4
 [0.2.3]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.2...app-v0.2.3
 [0.2.2]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.1...app-v0.2.2
 [0.2.1]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.0...app-v0.2.1
