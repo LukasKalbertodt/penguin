@@ -414,4 +414,52 @@ mod tests {
         assert_eq!(filter("deflate"), "");
         assert_eq!(filter("br;q=1.0, deflate;q=0.5, gzip;q=0.8, *;q=0.1"), "br;q=1.0, gzip;q=0.8");
     }
+
+    #[test]
+    fn modify_csp() {
+        #[track_caller]
+        fn assert_rewritten(original: &str, expected_rewritten: &str) {
+            let mut header = hyper::header::HeaderValue::from_str(original).unwrap();
+            super::rewrite_csp(&mut header);
+            if header.to_str().unwrap() != expected_rewritten {
+                panic!(
+                    "unexpected rewritten CSP header:\n\
+                        original: {}\n\
+                        expected: {}\n\
+                        actual:   {}\n",
+                    original,
+                    expected_rewritten,
+                    header.to_str().unwrap(),
+                );
+            }
+        }
+
+        #[track_caller]
+        fn assert_not_rewritten(original: &str) {
+            assert_rewritten(original, original);
+        }
+
+        assert_not_rewritten("default-src *");
+        assert_not_rewritten("default-src 'self'");
+        assert_not_rewritten("default-src 'self' https://google.com");
+        assert_not_rewritten("default-src 'none' https://google.com; \
+            script-src 'self'; connect-src *");
+
+        assert_rewritten(
+            "default-src 'none'",
+            "connect-src 'self'; default-src 'none'; script-src 'self'; ",
+        );
+        assert_rewritten(
+            "default-src 'none'; script-src http:",
+            "connect-src 'self'; default-src 'none'; script-src http: 'self'; ",
+        );
+        assert_rewritten(
+            "default-src 'self'; connect-src 'none'",
+            "connect-src 'self'; default-src 'self'; ",
+        );
+        assert_rewritten(
+            "default-src 'self'; script-src https:",
+            "default-src 'self'; script-src https: 'self'; ",
+        );
+    }
 }
