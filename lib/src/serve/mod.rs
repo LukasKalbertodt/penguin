@@ -188,7 +188,7 @@ fn not_found(config: &Config) -> Response<Body> {
     const NOT_FOUND_HTML: &str = include_str!("../assets/not-found.html");
 
     log::debug!("Responding with 404 NOT FOUND");
-    let html = NOT_FOUND_HTML.replace("{{ reload_script }}", &crate::inject::script(config));
+    let html = NOT_FOUND_HTML.replace("{{ control_path }}", config.control_path());
 
     Response::builder()
         .status(StatusCode::NOT_FOUND)

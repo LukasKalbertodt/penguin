@@ -320,7 +320,7 @@ fn rewrite_location(header: &mut HeaderValue, target: &ProxyTarget, config: &Con
 fn gateway_error(msg: &str, e: hyper::Error, config: &Config) -> Response<Body> {
     let html = PROXY_ERROR_HTML
         .replace("{{ error }}", msg)
-        .replace("{{ reload_script }}", &inject::script(config));
+        .replace("{{ control_path }}", config.control_path());
 
     let status = if e.is_timeout() {
         StatusCode::GATEWAY_TIMEOUT

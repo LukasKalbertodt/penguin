@@ -142,7 +142,7 @@ async fn serve_dir(
     let html = DIR_LISTING_HTML
         .replace("{{ uri_path }}", uri_path)
         .replace("{{ entries }}", &entries)
-        .replace("{{ reload_script }}", &inject::script(&config));
+        .replace("{{ control_path }}", config.control_path());
 
     Ok(
         Response::builder()
