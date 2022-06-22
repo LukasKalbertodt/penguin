@@ -5,6 +5,10 @@ All notable changes to the penguin **library** will be documented here.
 
 ## [Unreleased]
 
+## [0.1.7] - 2022-06-22
+### Fixed
+- Fix 404, "gateway error" and dir-listing pages that were broken in the previous release. (The JS code wasn't injected correctly, showing up as plain text. Woops.)
+
 ## [0.1.6] - 2022-06-08
 ### Fixed
 - `Content-Security-Policy` (CSP) header is now potentially modified in proxy mode if required for penguin's injected script (`'self'` is potentially added to `script-src` and `connect-src`).
@@ -67,7 +71,8 @@ All notable changes to the penguin **library** will be documented here.
 - Everything
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.6...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.7...HEAD
+[0.1.7]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.6...lib-v0.1.7
 [0.1.6]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.5...lib-v0.1.6
 [0.1.5]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.4...lib-v0.1.5
 [0.1.4]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.3...lib-v0.1.4

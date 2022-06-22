@@ -1,6 +1,6 @@
 [package]
 name = "penguin-app"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2018"
 
@@ -28,7 +28,7 @@ bunt = "0.2.4"
 log = "0.4"
 notify = "4"
 open = "2"
-penguin = { version = "0.1.6", path = "../lib" }
+penguin = { version = "0.1.7", path = "../lib" }
 pretty_env_logger = "0.4"
 structopt = "0.3"
 tokio = { version = "1", features = ["rt", "macros"]}

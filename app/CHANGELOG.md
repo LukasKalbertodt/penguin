@@ -6,6 +6,10 @@ All notable changes to the penguin **CLI app** will be documented here.
 ## [Unreleased]
 
 
+## [0.2.5] - 2022-06-22
+
+- Updated the library to v0.1.6 ⇒ [check its changelog](../lib/CHANGELOG.md#017---2022-06-22).
+
 ## [0.2.4] - 2022-06-08
 
 - Updated the library to v0.1.6 ⇒ [check its changelog](../lib/CHANGELOG.md#016---2022-06-08).
@@ -49,7 +53,8 @@ Updated the library to v0.1.2 ⇒ [check its changelog](../lib/CHANGELOG.md#012-
 - Everything
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.4...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.5...HEAD
+[0.2.5]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.4...app-v0.2.5
 [0.2.4]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.3...app-v0.2.4
 [0.2.3]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.2...app-v0.2.3
 [0.2.2]: https://github.com/LukasKalbertodt/penguin/compare/app-v0.2.1...app-v0.2.2
