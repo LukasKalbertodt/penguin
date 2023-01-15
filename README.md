@@ -1,7 +1,7 @@
 # Penguin: language and framework agnostic dev server
 
 
-[<img alt="CI status of main" src="https://img.shields.io/github/workflow/status/LukasKalbertodt/penguin/CI/main?label=CI&logo=github&logoColor=white&style=for-the-badge" height="23">](https://github.com/LukasKalbertodt/penguin/actions?query=workflow%3ACI+branch%3Amain)
+[<img alt="CI status of main" src="https://img.shields.io/github/actions/workflow/status/LukasKalbertodt/penguin/ci.yml?branch=main&label=CI&logo=github&logoColor=white&style=for-the-badge" height="23">](https://github.com/LukasKalbertodt/penguin/actions/workflows/ci.yml)
 [<img alt="App version on crates.io" src="https://img.shields.io/crates/v/penguin-app?label=app%20version&logo=rust&style=for-the-badge" height="23">](https://crates.io/crates/penguin-app)
 [<img alt="Library version on crates.io" src="https://img.shields.io/crates/v/penguin?label=library%20version&logo=rust&style=for-the-badge" height="23">](https://crates.io/crates/penguin)
 [<img alt="docs.rs" src="https://img.shields.io/crates/v/penguin?color=blue&label=library%20docs&style=for-the-badge" height="23">](https://docs.rs/penguin)
