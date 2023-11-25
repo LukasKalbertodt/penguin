@@ -1,7 +1,8 @@
 use std::{io::{self, ErrorKind}, path::Path};
 
-use hyper::{Body, Request, Response};
-use tokio::fs;
+use http_range::{HttpRange, HttpRangeParseError};
+use hyper::{Body, Request, Response, header, StatusCode};
+use tokio::{fs, io::{AsyncSeekExt, AsyncReadExt}};
 use tokio_util::codec::{FramedRead, BytesCodec};
 
 use crate::{inject, Config};
@@ -74,10 +75,10 @@ async fn serve(
         not_found(config)
     } else if path.is_file() {
         log::trace!("Serving requested file");
-        serve_file(&path, config).await
+        serve_file(&path, req, config).await
     } else if path.join("index.html").is_file() {
         log::trace!("Serving 'index.html' file in requested directory");
-        serve_file(&path.join("index.html"), config).await
+        serve_file(&path.join("index.html"), req, config).await
     } else {
         log::trace!("Listing contents of directory...");
         serve_dir(req.uri().path(), &path, config)
@@ -154,9 +155,13 @@ async fn serve_dir(
 }
 
 /// Serves a single file. If it's a HTML file, our JS code is injected.
-async fn serve_file(path: &Path, config: &Config) -> Response<Body> {
+async fn serve_file(
+    path: &Path,
+    req: &Request<Body>,
+    config: &Config,
+) -> Response<Body> {
     // TODO: maybe we should return 403 if the file can't be read due to
-    // permissions?
+    // permissions? Generally, the `unwrap`s in this function are... meh.
 
     let mime = mime_guess::from_path(&path).first();
     if mime.as_ref().map_or(false, |mime| mime.as_ref().starts_with("text/html")) {
@@ -170,15 +175,56 @@ async fn serve_file(path: &Path, config: &Config) -> Response<Body> {
             .body(html.into())
             .expect("bug: invalid response")
     } else {
-        let file = fs::File::open(path).await.expect("failed to open file");
-        let body = Body::wrap_stream(FramedRead::new(file, BytesCodec::new()));
+        let mut file = fs::File::open(path).await.expect("failed to open file");
+        let file_size = file.metadata().await.expect("failed to read file metadata").len();
 
         let mut response = Response::builder()
-            .header("Server", SERVER_HEADER);
+            .header("Server", SERVER_HEADER)
+            .header(header::ACCEPT_RANGES, "bytes");
         if let Some(mime) = mime {
             response = response.header("Content-Type", mime.to_string());
         }
 
-        response.body(body).expect("bug: invalid response")
+        if let Some(range_header) = req.headers().get(header::RANGE) {
+            let range = match HttpRange::parse_bytes(range_header.as_bytes(), file_size) {
+                Ok(ranges) if ranges.len() == 1 => ranges[0],
+                Ok(_) => {
+                    return Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .header("Server", SERVER_HEADER)
+                        .body("multiple ranges in 'Range' header not supported".into())
+                        .expect("bug: invalid response")
+                }
+                Err(HttpRangeParseError::InvalidRange) => todo!(),
+                Err(HttpRangeParseError::NoOverlap) => {
+                    return Response::builder()
+                        .status(StatusCode::RANGE_NOT_SATISFIABLE)
+                        .header("Server", SERVER_HEADER)
+                        .body("".into())
+                        .expect("bug: invalid response");
+                }
+            };
+
+            file.seek(io::SeekFrom::Start(range.start)).await.unwrap();
+            let reader = FramedRead::new(file.take(range.length), BytesCodec::new());
+            let body = Body::wrap_stream(reader);
+            response
+                .status(StatusCode::PARTIAL_CONTENT)
+                .header(header::CONTENT_LENGTH, range.length)
+                .header(header::CONTENT_RANGE, format!(
+                    "bytes {}-{}/{}",
+                    range.start,
+                    range.start + range.length,
+                    file_size,
+                ))
+                .body(body)
+                .expect("bug: invalid response")
+        } else {
+            let body = Body::wrap_stream(FramedRead::new(file, BytesCodec::new()));
+            response
+                .header(header::CONTENT_LENGTH, file_size)
+                .body(body)
+                .expect("bug: invalid response")
+        }
     }
 }
