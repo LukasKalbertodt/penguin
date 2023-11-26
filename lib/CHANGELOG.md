@@ -5,6 +5,10 @@ All notable changes to the penguin **library** will be documented here.
 
 ## [Unreleased]
 
+## [0.1.8] - 2023-11-26
+- Add basic HTTP range request support for the file server. With this, video files served by Penguin can be played by Safari.
+- Add body sniffing to detect HTML content (and insert reload script) more often (see #11)
+
 ## [0.1.7] - 2022-06-22
 ### Fixed
 - Fix 404, "gateway error" and dir-listing pages that were broken in the previous release. (The JS code wasn't injected correctly, showing up as plain text. Woops.)
@@ -71,7 +75,8 @@ All notable changes to the penguin **library** will be documented here.
 - Everything
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.7...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.8...HEAD
+[0.1.8]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.7...lib-v0.1.8
 [0.1.7]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.6...lib-v0.1.7
 [0.1.6]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.5...lib-v0.1.6
 [0.1.5]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.4...lib-v0.1.5
