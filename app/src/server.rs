@@ -2,6 +2,7 @@ use std::{env, ops::Deref, path::Path, thread, time::Duration};
 
 use anyhow::{Context, Result};
 use log::{debug, info, trace, LevelFilter};
+use notify::Op;
 use penguin::{Config, Controller, Mount, ProxyTarget, Server};
 
 use crate::args::{Args, DEFAULT_PORT, ServeOptions};
@@ -44,7 +45,7 @@ pub(crate) async fn run(
     };
 
     if !watched_paths.is_empty() {
-        watch(controller, options.debounce_duration, &watched_paths)?;
+        watch(controller, options, &watched_paths)?;
     }
 
     // Nice output of what is being done
@@ -89,7 +90,7 @@ pub(crate) async fn run(
 
 fn watch<'a>(
     controller: Controller,
-    debounce_duration: Duration,
+    options: &ServeOptions,
     paths: &[&Path],
 ) -> Result<()> {
     use std::sync::mpsc::{channel, RecvTimeoutError};
@@ -114,13 +115,24 @@ fn watch<'a>(
 
     // We create a new thread that will react to incoming events and trigger a
     // page reload.
+    let options = options.clone();
     thread::spawn(move || {
         // Move it to the thread to avoid dropping it early.
         let _watcher = watcher;
+        let debounce_duration_of = |event: &RawEvent| {
+            if event.op.as_ref().is_ok_and(|&op| op == Op::REMOVE) {
+                options.removal_debounce_duration
+            } else {
+                options.debounce_duration
+            }
+        };
 
         while let Ok(event) = rx.recv() {
+            let mut debounce_duration = debounce_duration_of(&event);
+
             debug!(
-                "Received watch-event for '{}'. Debouncing now for {:?}.",
+                "Received watch-event '{:?}' for '{}'. Debouncing now for {:?}.",
+                event.op,
                 pretty_path(&event),
                 debounce_duration,
             );
@@ -129,7 +141,21 @@ fn watch<'a>(
             // `debounce_duration`.
             loop {
                 match rx.recv_timeout(debounce_duration) {
-                    Ok(event) => trace!("Debounce interrupted by '{}'", pretty_path(&event)),
+                    Ok(event) => {
+                        trace!(
+                            "Debounce interrupted by '{:?}' of '{}'",
+                            event.op,
+                            pretty_path(&event),
+                        );
+
+                        // We reset the waiting duration to the minimum of both
+                        // events' durations. So if any non-remove event is
+                        // involved, the shorter duration is used.
+                        debounce_duration = std::cmp::min(
+                            debounce_duration_of(&event),
+                            debounce_duration,
+                        );
+                    },
                     Err(RecvTimeoutError::Timeout) => break,
                     Err(RecvTimeoutError::Disconnected) => return,
                 }

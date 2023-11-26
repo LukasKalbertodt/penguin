@@ -85,7 +85,7 @@ pub(crate) enum Command {
     Reload,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Clone, StructOpt)]
 pub(crate) struct ServeOptions {
     /// Mount a directory on an URI path: '--mount <uri>:<path>'.
     ///
@@ -126,6 +126,21 @@ pub(crate) struct ServeOptions {
         parse(try_from_str = parse_duration)
     )]
     pub(crate) debounce_duration: Duration,
+
+    /// The debounce duration (in ms) for when a file in a watched path was
+    /// removed.
+    ///
+    /// Like `--debounce`, but for "remove" file system events. This is treated
+    /// separately as usually reloading quickly on deletion is not useful: the
+    /// reload would result in a 404 page. And in many situation (e.g. cargo
+    /// doc) the watched directory is first wiped by a build process and then
+    /// populated again after a while. So this default is much higher.
+    #[structopt(
+        long = "--removal-debounce",
+        default_value = "3000",
+        parse(try_from_str = parse_duration)
+    )]
+    pub(crate) removal_debounce_duration: Duration,
 }
 
 fn parse_mount(s: &str) -> Result<Mount, &'static str> {
