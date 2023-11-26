@@ -27,6 +27,7 @@ http-range = "0.1.5"
 hyper = { version = "0.14", features = ["client", "http1", "http2", "server", "stream", "tcp"] }
 hyper-tls = "0.5"
 hyper-tungstenite = "0.8"
+infer = "0.15.0"
 log = "0.4"
 mime_guess = "2"
 thiserror = "1"

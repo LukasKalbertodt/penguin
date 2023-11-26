@@ -1,14 +1,16 @@
 use std::{
     cmp::min,
+    collections::HashSet,
     convert::{TryFrom, TryInto},
     io::Read,
-    sync::{Arc, atomic::{AtomicBool, Ordering}},
+    sync::{Arc, Mutex, OnceLock, atomic::{AtomicBool, Ordering}},
     time::Duration,
 };
 
+use futures::StreamExt;
 use hyper::{
     Body, Client, Request, Response, StatusCode, Uri,
-    body::Bytes,
+    body::{Bytes, HttpBody},
     header::{self, HeaderValue},
     http::uri::Scheme,
 };
@@ -107,6 +109,12 @@ fn adjust_request(req: &mut Request<Body>, target: &ProxyTarget) {
 /// https://almanac.httparchive.org/en/2019/compression
 const SUPPORTED_COMPRESSIONS: &[&str] = &["gzip", "br", "identity"];
 
+fn download_body_error(e: hyper::Error, uri: &Uri, ctx: &Context) -> Response<Body> {
+    log::warn!("Failed to download full response from proxy target");
+    let msg = format!("Failed to download response from {}\n\n{}", uri, e);
+    return gateway_error(&msg, e, &ctx.config);
+}
+
 async fn adjust_response(
     mut response: Response<Body>,
     ctx: &Context,
@@ -119,25 +127,81 @@ async fn adjust_response(
         rewrite_location(header, target, config);
     }
 
-    let content_type = response.headers().get(header::CONTENT_TYPE);
-    let is_html = content_type.map_or(false, |v| v.as_ref().starts_with(b"text/html"));
-    if !is_html {
-        return response;
+    // Download the beginning of the body for sniffing.
+    let (mut parts, mut body) = response.into_parts();
+    let mut body_start = vec![];
+    while !body.is_end_stream() && body_start.len() < 512 {
+        match body.data().await {
+            None => break,
+            Some(Err(e)) => return download_body_error(e, uri, ctx),
+            Some(Ok(bytes)) => body_start.extend_from_slice(&bytes),
+        }
     }
+
+    let html_content_type = parts.headers.get(header::CONTENT_TYPE).map(|v| {
+        v.as_bytes().starts_with(b"text/html")
+            || v.as_bytes().starts_with(b"application/xhtml+xml")
+    });
+    let looks_like_html = body_start.iter().all(|b| *b != 0)
+        && infer::text::is_html(&body_start);
+
+    let uri_pq = uri.path_and_query().map(|pq| pq.to_string()).unwrap_or_default();
+    macro_rules! warn_once {
+        ($($t:tt)*) => {
+            static ALREADY_WARNED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+            let newly_inserted = ALREADY_WARNED
+                .get_or_init(|| Mutex::new(HashSet::new()))
+                .lock()
+                .unwrap()
+                .insert(uri_pq.clone());
+            if newly_inserted {
+                log::warn!($($t)*);
+            }
+        };
+    }
+
+    // Determine if we should treat this as HTML (i.e. inject our script).
+    let adjust_body = match (html_content_type, looks_like_html) {
+        (None, true) => {
+            warn_once!("Proxy response to '{uri_pq}' looks like HTML, but no 'Content-Type' \
+                header exists. I will treat it as HTML (injecting reload script), but setting \
+                the correct 'Content-Type' header is recommended.",
+            );
+            true
+        }
+        (None, false) => false,
+        (Some(true), true) => true,
+        (Some(false), true) => {
+            let header_bytes = parts.headers.get(header::CONTENT_TYPE).unwrap().as_bytes();
+            warn_once!("Proxy response to '{uri_pq}' looks like HTML, but the 'Content-Type' \
+                header indicates otherwise: '{}'. Not injecting reload script.",
+                String::from_utf8_lossy(header_bytes),
+            );
+            false
+        }
+        (Some(v), false) => v,
+    };
+
+    if !adjust_body {
+        let recombined_body = Body::wrap_stream(
+            futures::stream::once(async { Ok(Bytes::from(body_start)) }).chain(body)
+        );
+
+        return Response::from_parts(parts, recombined_body);
+    }
+
 
     log::trace!("Response from proxy is HTML: injecting script");
 
     // The response is HTML: we need to download it completely and
     // inject our script.
-    let (mut parts, body) = response.into_parts();
-    let body = match hyper::body::to_bytes(body).await {
-        Ok(body) => body,
-        Err(e) => {
-            log::warn!("Failed to download full response from proxy target");
-            let msg = format!("Failed to download response from {}\n\n{}", uri, e);
-            return gateway_error(&msg, e, &ctx.config);
+    while let Some(buf) = body.data().await {
+        match buf {
+            Ok(buf) => body_start.extend_from_slice(&buf),
+            Err(e) => return download_body_error(e, uri, ctx),
         }
-    };
+    }
+    let body = body_start;
 
     // Uncompress if necessary. All this allocates more than necessary, but I'd
     // rather keep easier code in this case, as performance is unlikely to
@@ -173,7 +237,7 @@ async fn adjust_response(
                 "Unsupported content encoding '{}'. Not injecting script!",
                 String::from_utf8_lossy(other),
             );
-            body
+            Bytes::from(body)
         }
     };
 
