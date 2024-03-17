@@ -948,7 +948,7 @@ checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
 
 [[package]]
 name = "penguin"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "brotli",
  "flate2",
@@ -967,7 +967,7 @@ dependencies = [
 
 [[package]]
 name = "penguin-app"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "bunt",
