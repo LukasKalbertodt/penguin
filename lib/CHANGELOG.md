@@ -5,6 +5,9 @@ All notable changes to the penguin **library** will be documented here.
 
 ## [Unreleased]
 
+## [0.1.9] - 2025-07-15
+- Fix `Content-Range` header for HTTP range requests
+
 ## [0.1.8] - 2023-11-26
 - Add basic HTTP range request support for the file server. With this, video files served by Penguin can be played by Safari.
 - Add body sniffing to detect HTML content (and insert reload script) more often (see #11)
@@ -75,7 +78,8 @@ All notable changes to the penguin **library** will be documented here.
 - Everything
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.8...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.9...HEAD
+[0.1.9]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.8...lib-v0.1.9
 [0.1.8]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.7...lib-v0.1.8
 [0.1.7]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.6...lib-v0.1.7
 [0.1.6]: https://github.com/LukasKalbertodt/penguin/compare/lib-v0.1.5...lib-v0.1.6

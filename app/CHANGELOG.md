@@ -6,7 +6,10 @@ All notable changes to the penguin **CLI app** will be documented here.
 ## [Unreleased]
 
 
-## [0.2.6] - 2022-11-26
+## [0.2.7] - 2025-07-15
+- Updated the library to v0.1.9 ⇒ [check its changelog](../lib/CHANGELOG.md#019---2025-07-15).
+
+## [0.2.6] - 2023-11-26
 - Improve `cargo doc` workflow by treating `remove` file system events as less important in watcher. Adds `--removal-debounce` flag. See [385b63](https://github.com/LukasKalbertodt/penguin/commit/385b6395142aff28fa5063162a8023e1392b0cf1).
 - Updated the library to v0.1.8 ⇒ [check its changelog](../lib/CHANGELOG.md#017---2022-06-22).
   - Add basic HTTP range request support for the file server. With this, video files served by Penguin can be played by Safari.
