@@ -12,11 +12,11 @@ env:
 jobs:
   check:
     name: 'Build & test'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Restore cargo cache
-      uses: Swatinem/rust-cache@v1.3.0
+      uses: Swatinem/rust-cache@v2
     - name: Install tsc
       run: npm install
       working-directory: lib
