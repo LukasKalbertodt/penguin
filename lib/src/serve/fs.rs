@@ -214,7 +214,7 @@ async fn serve_file(
                 .header(header::CONTENT_RANGE, format!(
                     "bytes {}-{}/{}",
                     range.start,
-                    range.start + range.length,
+                    range.start + range.length - 1,
                     file_size,
                 ))
                 .body(body)
